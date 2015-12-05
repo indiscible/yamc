@@ -9,35 +9,26 @@ class JSONRPC:
     
 class RPC(object):
     @classmethod
-    def GetProperties(c,**kwargs):
+    def Get(c,ps):
         r={}
-        for p in kwargs["properties"]:
-            print "looking for ", p
-            if hasattr(c,p):
-                print 'prop ', p
-                r[p]= getattr(c,p)
-        return r
-    @classmethod
-    def GetInfoBooleans(c,**kwargs):
-        r={}
-        for p in kwargs["booleans"]:
+        for p in ps:
             name= "".join( p.split(".") )
-            print "bool ",  p
-            if hasattr(c, "".join( p.split(".") ) ):
-                print "found ", name
-                r[p]=True
-        return r
-    @classmethod
-    def GetInfoLabels(c,**kwargs):
-        r={}
-        for p in kwargs["labels"]:
-            name= "".join( p.split(".") )
-            print "label ",  p
             if hasattr(c, name ):
-                print "found ", name
                 r[p]= getattr(c,name)
         return r
+            
+    @classmethod
+    def GetProperties(c,**kwargs):
+        return c.Get(kwargs["properties"])
+
+    @classmethod
+    def GetInfoBooleans(c,**kwargs):
+        return c.Get(kwargs["booleans"])
         
+    @classmethod
+    def GetInfoLabels(c,**kwargs):
+        return c.Get(kwargs["labels"])
+    
 class Application(RPC):
     version= { 'major':15, 'tag':'stable', 'minor':2,'revision':'unknown'}
     volume= 50
@@ -46,30 +37,16 @@ class Application(RPC):
 class XBMC(RPC):
     SystemPlatformLinux= True
     SystemPlatformLinuxRaspberryPi= True
-    SystemKernelVersion= "Open Source Media Center 2015.10-1"
-    SystemBuildVersion= "15.2"
+    SystemKernelVersion= "Gilles"
+    SystemBuildVersion= "0.0"
     
 class Player(RPC):
     playerid=0
     _type="video"
     @classmethod
     def GetActivePlayers(c):
-        return []   
-        
-def execute(j):
-    c,m= j["method"].split(".")
-    if ( globals().has_key(c) ):
-        C= globals()[c]
-        print "class ", C
-        if hasattr( C, m ):
-            print "method ", m
-            if j.has_key("params"):
-                print "params: ", j["params"]
-                return getattr(C,m,)(**j["params"])
-            else:
-                return getattr(C,m)()
-    return "Method Not found"
-
+        return []
+    
 def execute(j):
     c,m= j["method"].split(".")
     C= globals()[c]
@@ -79,9 +56,6 @@ def execute(j):
         return getattr(C,m)()
 
 def reply(j):
-    print "reply: ", j
-    e= execute(j)
-    print "execute: ", e
     return { "id": j["id"], "jsonrpc":"2.0", "result": execute(j) }
 
 def error(code,message):
@@ -106,7 +80,9 @@ def server(request):
     except ValueError as e:
         print e
         return Response( "", mimetype='application/json')
-    return Response(  json.dumps(r), mimetype='application/json')
+    r= json.dumps(r)
+    print r
+    return Response(  r, mimetype='application/json')
 
 
 #if __name__ == '__main__':
