@@ -33,7 +33,7 @@ def Song(f):
         "year": int(i["date"][0][:4]),
         "album": i["album"][0],
         "track": int(i["tracknumber"][0].split("/")[0]),
-        "duration": int(i["length"][0]),
+        "duration": int(i["length"][0])/1000,
         "musicbrainztrackid": i["musicbrainz_trackid"][0],
         "musicbrainzartistid": i["musicbrainz_artistid"][0],
         "musicbrainzalbumid": i["musicbrainz_albumid"][0],
@@ -43,6 +43,7 @@ def Song(f):
         "thumbnail": Thumbnail(i._EasyID3__id3["APIC:"]),
         "rating":0
         }
+    print s["duration"]
     songs.append(s)
     s["songid"]= len(songs)
     s["artistid"]= Artist(s)
