@@ -1,6 +1,7 @@
 from werkzeug.wrappers import Request, Response
 from werkzeug.serving import make_server
 from select import select
+import subprocess
 import json
 import event
 
@@ -30,6 +31,16 @@ class RPC(object):
     @classmethod
     def GetInfoLabels(c,labels):
         return c.Get(labels)
+
+    @classmethod
+    def GetList(c,k,l):
+        v= getattr(c,k)
+        sv= v[ l["start"]:l["end"] ]
+        return { k: v,
+                 "limits":
+                 { "start": 0, "end":len(sv), "total":len(v) } }
+        
+
 
 class Settings(RPC):
     audiooutputpassthrough= False
@@ -63,11 +74,20 @@ class XBMC(RPC):
 class Player(RPC):
     playerid=0
     _type="video"
+    ffplay= None
     @classmethod
     def GetActivePlayers(c):
         return []
+    @classmethod
+    def Open(c,item):
+        if c.ffplay:
+            c.ffplay.terminate()
+        s= AudioLibrary.songs[ item["songid"]-1 ]
+        c.ffplay= subprocess.Popen(["ffplay","-i",s["file"]])  
 
 class VideoLibrary(RPC):
+    musicvideos= [ { "musicvideoid":1, "album":"emerald" } ]
+    
     @classmethod
     def GetMovies(c,**p):
         print p
@@ -76,22 +96,29 @@ class VideoLibrary(RPC):
     def GetTVShows(c,**p):
         return [ { "title": "seinfield", "file":"seinfield.Avi" } ]
     @classmethod
-    def GetMusicVideos(c,**p):
-        return [ { "title":"Dry", "artist":"PJ Harvey" } ]
- 
+    def GetMusicVideos(c,properties,limits,sort=False):
+        return c.GetList("musicvideos",limits)
+    
 class AudioLibrary(RPC):
+    genres= [ {"genreid":1,"title": "Rock", "thumbnail":"" },
+              {"genreid":2,"title": "Jazz", "thumbnail":"" } ]
+    artists=[ {"artist":"jimi", "artistid":1 },
+              {"artist":"qunicy", "artisid":2 } ]
+    albums= [ {"albumid":1, "albumlabel":"Are you experienced?" },
+              {"albumid":2, "albumlabel":"fly" } ]
+    songs= json.load( open("songs.json","r") )
     @classmethod
-    def GetArtists(c,**p):
-        return [ { "description":"jimi hendriw"} ]
+    def GetArtists(c,properties,limits):
+        return c.GetList("artists",limits)
     @classmethod
-    def GetGenres(c,**p):
-        return [ { "title":"rock", "thumbnail":"rock.jpeg"} ]
+    def GetGenres(c,properties,limits):
+        return c.GetList("genres",limits)
     @classmethod
-    def GetAlbums(c,**p):
-        return [ { "title":"Are You Experienced", "artist":"jimi hendriw"} ]
+    def GetAlbums(c,properties,limits):
+        return c.GetList("albums",limits)
     @classmethod
-    def GetSongs(c,**p):
-        return [ { "title":"Hey Joe", "track":1} ]
+    def GetSongs(c,limits, properties=None):
+        return c.GetList("songs",limits)
     
 class TVLibrary(RPC):
     @classmethod
@@ -103,27 +130,26 @@ def execute(j):
     c,m= j["method"].split(".")
     C= globals()[c]
     if j.has_key("params"):
+        print c,m,j["params"]
         return getattr(C,m)(**j["params"])
     else:
+        print c,m
         return getattr(C,m)()
 
 def reply(j):
-    return { "id": j["id"], "jsonrpc":"2.0", "result": execute(j) }
+    e= execute(j)
+    print e
+    return { "id": j["id"], "jsonrpc":"2.0", "result": e }
 
 def error(code,message):
     return { "id": j["id"], "jsonrpc":"2.0", "error":
              { "code": code, "message": message } }
 
-    
-print getattr(Application,"GetProperties")(**{ 'properties':["version"]})
-
-@Request.application
-def app(request):
-    print request
-    print request.data
+#Log= open("log.txt","w")
+def post( d ):
     try:
         r=[]
-        j= json.loads(request.data)
+        j= json.loads(d)
         if isinstance(j,list):
             for jj in j:
                 r.append(reply(jj))
@@ -133,10 +159,43 @@ def app(request):
         print e
         return Response( "", mimetype='application/json')
     r= json.dumps(r)
-    print r
+ #   print r
     return Response(  r, mimetype='application/json')
 
-server= make_server('192.168.0.13', 8002, app)
+yopg=None
+
+def get(d):
+    if  d=="jsonrpc":
+        return Response( "", mimetype='text/plain' )
+    idx=d.find("/")
+    if idx<0:
+        return Response( "", mimetype='text/plain' )        
+    global yopg
+    yopg= d
+    if d[:idx+1]=="image/":
+        try:
+            with open( d[idx+1:], "rb" ) as inp:
+                return Response( inp.read(), mimetype='image/jpeg' )
+        except IOError as e:
+            print e
+            return Response( "", mimetype='text/plain' )                
+    raise Exception
+    
+@Request.application
+def app(request):
+#    print request
+#   print request.data
+#   Log.write(request.data+"\n")
+    global yop
+    dir(request)
+    if request.method=="POST":
+        return post(request.data)
+    elif request.method=="GET":
+        yop=request
+        print "Get:", request.data, request.full_path
+        return get(request.full_path[1:-1])
+   
+server= make_server('192.168.0.13', 80, app)
 print "server started"
 ss= [ server.socket, event.udp, event.tcp ]
 def close():
