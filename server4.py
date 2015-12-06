@@ -33,14 +33,16 @@ class RPC(object):
         return c.Get(labels)
 
     @classmethod
-    def GetList(c,k,l):
+    def GetList(c,k,p,l):
         v= getattr(c,k)
-        sv= v[ l["start"]:l["end"] ]
-        return { k: v,
+        r= v[ l["start"]:l["end"] ]
+        if p:
+            r=[]
+            for e in v[ l["start"]:l["end"] ]:
+                r.append( { k:e[k] for k in p if e.has_key(k)} )
+        return { k: r,
                  "limits":
-                 { "start": 0, "end":len(sv), "total":len(v) } }
-        
-
+                 { "start": 0, "end":len(r), "total":len(v) } }
 
 class Settings(RPC):
     audiooutputpassthrough= False
@@ -97,7 +99,8 @@ class VideoLibrary(RPC):
         return [ { "title": "seinfield", "file":"seinfield.Avi" } ]
     @classmethod
     def GetMusicVideos(c,properties,limits,sort=False):
-        return c.GetList("musicvideos",limits)
+        return c.GetList("musicvideos",properties,limits)
+
     
 class AudioLibrary(RPC):
     genres= [ {"genreid":1,"title": "Rock", "thumbnail":"" },
@@ -107,18 +110,28 @@ class AudioLibrary(RPC):
     albums= [ {"albumid":1, "albumlabel":"Are you experienced?" },
               {"albumid":2, "albumlabel":"fly" } ]
     songs= json.load( open("songs.json","r") )
+    albums= json.load( open("albums.json","r") )
+    artists= json.load( open("artists.json", "r") )
     @classmethod
-    def GetArtists(c,properties,limits):
-        return c.GetList("artists",limits)
+    def GetArtists(c,limits,properties=[]):
+        properties.append("artistid")
+        properties.append("artist")
+        properties= ["artist","artistid"]
+        return c.GetList("artists",set(properties),limits)
     @classmethod
-    def GetGenres(c,properties,limits):
-        return c.GetList("genres",limits)
+    def GetGenres(c,limits,properties=[]):
+        properties.append("genreid")
+        return c.GetList("genres",set(properties),limits)
     @classmethod
-    def GetAlbums(c,properties,limits):
-        return c.GetList("albums",limits)
+    def GetAlbums(c,limits,properties=[]):
+        properties.append("albumid")
+        properties=["albumid","albumlabel","title","artistid"]
+        return c.GetList("albums",set(properties),limits)
     @classmethod
-    def GetSongs(c,limits, properties=None):
-        return c.GetList("songs",limits)
+    def GetSongs(c,limits, properties=[]):
+        properties.append("songid")
+        properties=["songid","title","track","artistid"]
+        return c.GetList("songs",set(properties),limits)
     
 class TVLibrary(RPC):
     @classmethod
@@ -172,13 +185,12 @@ def get(d):
         return Response( "", mimetype='text/plain' )        
     global yopg
     yopg= d
-    if d[:idx+1]=="image/":
-        try:
-            with open( d[idx+1:], "rb" ) as inp:
-                return Response( inp.read(), mimetype='image/jpeg' )
-        except IOError as e:
-            print e
-            return Response( "", mimetype='text/plain' )                
+    try:
+        with open( d, "rb" ) as inp:
+            return Response( inp.read(), mimetype='image/jpeg' )
+    except IOError as e:
+        print e
+        return Response( "", mimetype='text/plain' )                
     raise Exception
     
 @Request.application

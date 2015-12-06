@@ -5,7 +5,7 @@ from json import dump
 from hashlib import sha1
 
 src= "C:\Music"
-thumbs= "Thumbs\\"
+thumbs= "image\\"
 
 dumpdb= True
 
@@ -24,12 +24,10 @@ def Thumbnail(img):
         return h
     return ""
 
-songid=0
+songs=[]
 def Song(f):
     i= EasyID3(f)
-    global songid
-    songid= songid+1    
-    return {
+    s={
         "title": i["title"][0],
         "artist": i["artist"][0],
         "year": int(i["date"][0][:4]),
@@ -42,15 +40,62 @@ def Song(f):
         "musicbrainzalbumartistid": i["musicbrainz_albumartistid"][0],
         "file": f,
         "disc": int(i["discnumber"][0].split("/")[0]),
-        "songid":songid,
         "thumbnail": Thumbnail(i._EasyID3__id3["APIC:"]),
         "rating":0
         }
+    songs.append(s)
+    s["songid"]= len(songs)
+    s["artistid"]= Artist(s)
+    s["albumid"]= Album(s)
+    
+artistid={}
+artists=[]
+def Artist(s):
+    global artistsid
+    if artistid.has_key( s["artist"] ):
+        return artistid[ s["artist"] ]
+    a= {
+        "artist": s["artist"],
+        "description": s["artist"],
+        "thumbnail": s["thumbnail"]
+        } 
+    artists.append(a)
+    newid= len(artists)
+    a["artistid"]=newid
+    artistid[ s["artist"] ]= newid    
+    return newid
 
+albumid={}
+albums=[]
+def Album(s):
+    global albumid
+    if albumid.has_key( s["album"] ):
+        return albumid[ s["album"] ]
+    a={
+         "title": s["album"],
+         "albumlabel": s["album"],
+         "artist": s["artist"],
+         "displayartist": s["artist"],
+         "description": s["album"],
+         "rating":0,
+         "year": s["year"],
+         "musicbrainzalbumid":s["musicbrainzalbumid"],
+         "musicbrainzalbumartistid":s["musicbrainzalbumartistid"],
+         "thumbnail": s["thumbnail"],
+         "artistid": s["artistid"],
+         "rating":0
+         }
+    albums.append(a)
+    newid= len(albums)
+    a["albumid"]=newid
+    albumid[ s["album"] ]= newid
+    return newid
 
-db= []
-for s in songs:
-    db.append( Song(s) )        
-
+for (path,ndir,nfile) in walk(src):
+    for name in nfile:
+        Song(path+"\\"+name)
+         
 if dumpdb:
-    dump(db, open("songs.json","w"))
+    dump( songs, open("songs.json","w"))
+    dump( artists, open("artists.json","w"))
+    dump( albums, open("albums.json","w"))
