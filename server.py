@@ -4,12 +4,11 @@ from select import select
 import subprocess
 import json
 import event
-import xbmc
+import yamc
 from hashlib import sha1
 
 def reply(j):
-    e= xbmc.execute(j)
-    #print e
+    e= yamc.execute(j)
     return { "id": j["id"], "jsonrpc":"2.0", "result": e }
 
 def error(code,message):
@@ -76,13 +75,13 @@ def filehash(file):
     with open(file,"rb") as inp:
         return sha1(inp.read()).hexdigest()
 
-oldhash= filehash("xbmc.py")
+oldhash= filehash("yamc.py")
 while(1):
     rl = select( ss, [], [])
-    newhash= filehash("xbmc.py")
+    newhash= filehash("yamc.py")
     if newhash!=oldhash:
         print "new hash: ", newhash, oldhash
-        reload(xbmc)
+        reload(yamc)
         oldhash=newhash
     for r in rl[0]:
         if r==server.socket:
