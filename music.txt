@@ -1,2 +1,0 @@
-{"jsonrpc":"2.0","id":1,"method":"AudioLibrary.GetGenres","params":{"properties":["title","thumbnail"],"limits":{"start":0,"end":750}}}
-{"jsonrpc":"2.0","id":1,"method":"VideoLibrary.GetMusicVideos","params":{"properties":["album","artist","genre","studio","track","year","director","playcount","plot","runtime","thumbnail","title","dateadded","file","resume"],"limits":{"start":0,"end":750}}}
