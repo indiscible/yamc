@@ -1,65 +1,99 @@
-import gevent
-import gevent.wsgi
-import gevent.queue
-from tinyrpc.protocols.jsonrpc import JSONRPCProtocol
-from tinyrpc.transports.wsgi import WsgiServerTransport
-from tinyrpc.server.gevent import RPCServerGreenlets
-from tinyrpc.dispatch import RPCDispatcher
+from werkzeug.wrappers import Request, Response
+from werkzeug.serving import make_server
+from select import select
+import subprocess
+import json
+import event
+import xbmc
+from hashlib import sha1
 
-dispatcher = RPCDispatcher()
-json = RPCDispatcher()
-application= RPCDispatcher()
-xbmc= RPCDispatcher()
+def reply(j):
+    e= xbmc.execute(j)
+    #print e
+    return { "id": j["id"], "jsonrpc":"2.0", "result": e }
 
-dispatcher.add_subdispatch( json, "JSONRPC." )
-dispatcher.add_subdispatch( application, "Application." )
-dispatcher.add_subdispatch( xbmc, "XBMC." )
+def error(code,message):
+    return { "id": j["id"], "jsonrpc":"2.0", "error":
+             { "code": code, "message": message } }
 
-transport = WsgiServerTransport(queue_class=gevent.queue.Queue)
+#Log= open("log.txt","w")
+def post( d ):
+    try:
+        r=[]
+        j= json.loads(d)
+        if isinstance(j,list):
+            for jj in j:
+                r.append(reply(jj))
+        else:
+            r= reply(j)            
+    except ValueError as e:
+        print e
+        return Response( "", mimetype='application/json')
+    r= json.dumps(r)
+ #   print r
+    return Response(  r, mimetype='application/json')
 
-# start wsgi server as a background-greenlet
-wsgi_server = gevent.wsgi.WSGIServer(('192.168.0.13', 8001), transport.handle)
-gevent.spawn(wsgi_server.serve_forever)
+yopg=None
 
-rpc_server = RPCServerGreenlets(
-    transport,
-    JSONRPCProtocol(),
-    dispatcher
-)
+def get(d):
+    if  d=="jsonrpc":
+        return Response( "", mimetype='text/plain' )
+    idx=d.find("/")
+    if idx<0:
+        return Response( "", mimetype='text/plain' )        
+    global yopg
+    yopg= d
+    try:
+        with open( d, "rb" ) as inp:
+            return Response( inp.read(), mimetype='image/jpeg' )
+    except IOError as e:
+        print e
+        return Response( "", mimetype='text/plain' )                
+    raise Exception
+    
+@Request.application
+def app(request):
+#    print request
+#   print request.data
+#   Log.write(request.data+"\n")
+    global yop
+    dir(request)
+    if request.method=="POST":
+        return post(request.data)
+    elif request.method=="GET":
+        yop=request
+        print "Get:", request.data, request.full_path
+        return get(request.full_path[1:-1])
+   
+server= make_server('192.168.0.13', 80, app)
+print "server started"
+ss= [ server.socket, event.udp, event.tcp ]
+def close():
+    for s in ss:
+        s.close()
 
-@dispatcher.public
-def reverse_string(s):
-    return s[::-1]
+def filehash(file):
+    with open(file,"rb") as inp:
+        return sha1(inp.read()).hexdigest()
 
-@dispatcher.public
-def jsonrpc():
-    return "hello"
-
-@json.public
-def Ping():
-    return "pong"
-
-@application.public
-def GetProperties(**kwargs):
-    for p in kwargs["properties"]:
-        print p
-    return {'version':
-            { 'major':15,
-              'tag':'stable',
-              'minor':2,
-              'revision':'unknown'} } 
-@xbmc.public
-def GetInfoBooleans(**kwargs):
-    for p in kwargs["booleans"]:
-        print p
-    return { "System.Platform.Linux.RaspberryPi": True,
-             "System.Platform.Linux": True }
-
-@xbmc.public
-def GetInfoLabels(**kwargs):
-    for p in kwargs["labels"]:
-        print p
-    return { 'System.KernelVersion': 'Busy',
-             'System.BuildVersion':'15.2' }
-# in the main greenlet, run our rpc_server
-rpc_server.serve_forever()
+oldhash= filehash("xbmc.py")
+while(1):
+    rl = select( ss, [], [])
+    newhash= filehash("xbmc.py")
+    if newhash!=oldhash:
+        print "new hash: ", newhash, oldhash
+        reload(xbmc)
+        oldhash=newhash
+    for r in rl[0]:
+        if r==server.socket:
+            #print "http"
+            server.handle_request()
+        elif r==event.udp:
+            print "udp"
+            xbmc.handleudp()
+        elif r==event.tcp:
+            print "tcp"
+            event.handletcp()
+        else:
+            print "bad select", r
+ #   event.run()
