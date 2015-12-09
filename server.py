@@ -5,7 +5,11 @@ import subprocess
 import json
 import event
 import yamc
+import vlc
 from hashlib import sha1
+import logging
+import signal
+import sys
 
 def reply(j):
     e= yamc.execute(j)
@@ -15,7 +19,6 @@ def error(code,message):
     return { "id": j["id"], "jsonrpc":"2.0", "error":
              { "code": code, "message": message } }
 
-#Log= open("log.txt","w")
 def post( d ):
     try:
         r=[]
@@ -29,7 +32,6 @@ def post( d ):
         print e
         return Response( "", mimetype='application/json')
     r= json.dumps(r)
- #   print r
     return Response(  r, mimetype='application/json')
 
 yopg=None
@@ -52,11 +54,6 @@ def get(d):
     
 @Request.application
 def app(request):
-#    print request
-#   print request.data
-#   Log.write(request.data+"\n")
-    global yop
-    dir(request)
     if request.method=="POST":
         return post(request.data)
     elif request.method=="GET":
@@ -71,28 +68,35 @@ def close():
     for s in ss:
         s.close()
 
+def sigint(signal,frame):
+    close()
+    sys.exit(0)
+signal.signal(signal.SIGINT,sigint)
+
 def filehash(file):
     with open(file,"rb") as inp:
         return sha1(inp.read()).hexdigest()
 
-oldhash= filehash("yamc.py")
+libs= { yamc:"", vlc:"" }
+print libs
 while(1):
     rl = select( ss, [], [])
-    newhash= filehash("yamc.py")
-    if newhash!=oldhash:
-        print "new hash: ", newhash, oldhash
-        reload(yamc)
-        oldhash=newhash
+    for i in libs.items():
+        h= filehash(i[0].__name__+".py")
+        if h!=i[1]:
+            print "new hash: ", i[0].__name__
+            reload(i[0])
+            libs[i[0]]= h
     for r in rl[0]:
         if r==server.socket:
-            #print "http"
             server.handle_request()
         elif r==event.udp:
             print "udp"
-            xbmc.handleudp()
+            yamc.handleudp()
         elif r==event.tcp:
             print "tcp"
             event.handletcp()
         else:
             print "bad select", r
  #   event.run()
+

@@ -7,7 +7,7 @@ from hashlib import sha1
 src= "C:\Music"
 thumbs= "image\\"
 
-dumpdb= True
+dumpdb= False
 
 songs=[]
 for (path,ndir,nfile) in walk(src):

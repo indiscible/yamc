@@ -1,6 +1,7 @@
 import subprocess
 import event
 import json
+import vlc
 
 class JSONRPC:
     @staticmethod
@@ -18,7 +19,7 @@ class RPC(object):
         return r
             
     @classmethod
-    def GetProperties(c,properties):
+    def GetProperties(c,properties,**o):
         return c.Get(properties)
 
     @classmethod
@@ -41,6 +42,9 @@ class RPC(object):
                  "limits":
                  { "start": 0, "end":len(r), "total":len(v) } }
 
+def subdict(d,p):
+    return { k:d[k] for k in p if d.has_key(k) }
+    
 class Settings(RPC):
     audiooutputpassthrough= False
     @classmethod
@@ -69,27 +73,39 @@ class XBMC(RPC):
     SystemKernelVersion= "Gilles"
     SystemBuildVersion= "0.0"
 
-
 class Player(RPC):
+    print "Init Player class ----------------"
     playerid=0
     _type="video"
-    ffplay= None
+    itemid=-1
     @classmethod
     def GetActivePlayers(c):
-        return []
+        return [{"playerid":c.playerid, "type":c._type}]
     @classmethod
     def Open(c,item):
-        if c.ffplay:
-            c.ffplay.terminate()
-        s= AudioLibrary.songs[ item["songid"]-1 ]
-        c.ffplay= subprocess.Popen(["ffplay","-i",s["file"]])  
+        c.itemid= item["songid"]
+        s= AudioLibrary.songs[ c.itemid ]
+        r= vlc.play(s["file"])
+        c._type= "audio"
+        c.playerid=0
+        stream= r["information"]["category"]["Stream 0"]
+        XBMC.MusicPlayerCodec= stream["Codec"]
+        XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
+        XBMC.MusicPlayerBitRate= stream["Bitrate"]
+
+    @classmethod
+    def GetItem(c,playerid,properties=[]):
+        s= AudioLibrary.songs[ c.itemid ]
+        r= subdict( s, properties)
+        return r
+    @classmethod
+    def GetProperties(c,playerid,properties):
+        return subdict( vlc.status(), properties)
 
 class VideoLibrary(RPC):
     musicvideos= [ { "musicvideoid":1, "album":"emerald" } ]
-    
     @classmethod
     def GetMovies(c,**p):
-        print p
         return [ { "title": "indianajones", "file":"indiana.Avi" } ]
     @classmethod
     def GetTVShows(c,**p):
@@ -100,12 +116,6 @@ class VideoLibrary(RPC):
 
     
 class AudioLibrary(RPC):
-    genres= [ {"genreid":1,"title": "Rock", "thumbnail":"" },
-              {"genreid":2,"title": "Jazz", "thumbnail":"" } ]
-    artists=[ {"artist":"jimi", "artistid":1 },
-              {"artist":"qunicy", "artisid":2 } ]
-    albums= [ {"albumid":1, "albumlabel":"Are you experienced?" },
-              {"albumid":2, "albumlabel":"fly" } ]
     songs= json.load( open("database/songs.json","r") )
     albums= json.load( open("database/albums.json","r") )
     artists= json.load( open("database/artists.json", "r") )
@@ -139,11 +149,9 @@ class TVLibrary(RPC):
 class Files(RPC):
     @classmethod
     def GetSources(c,**p):
-        print p, p.keys(), p.values()
         return {}
     @classmethod
     def GetDirectory(c,**p):
-        print p, p.keys(), p.values()
         return {}
     
 def handleudp():
@@ -151,11 +159,13 @@ def handleudp():
 
 def execute(j):
     c,m= j["method"].split(".")
-    print c,m
     C= globals()[c]
     if j.has_key("params"):
-        #print c,m,j["params"]
-        return getattr(C,m)(**j["params"])
+        r=getattr(C,m)(**j["params"])
+        print c,m,j["params"],":",r,C
+        return r
     else:
-        #print c,m
-        return getattr(C,m)()
+        r= getattr(C,m)()
+        print c,m,":",r,C
+        return r
+
