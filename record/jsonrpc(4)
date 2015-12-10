@@ -1,0 +1,1 @@
+[{"jsonrpc":"2.0","id":0,"method":"Player.GetActivePlayers"},{"jsonrpc":"2.0","id":1,"method":"Application.GetProperties","params":{"properties":["volume","muted"]}}]
