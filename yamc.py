@@ -2,6 +2,8 @@ import subprocess
 import event
 import json
 import vlc
+import time
+import requests
 
 class JSONRPC:
     @staticmethod
@@ -65,7 +67,13 @@ class Application(RPC):
 def Mute():
     Application.muted= not Application.muted
     Application.OnVolumeChanged();
-    
+
+MusicLibrary= "Hello"
+Videos="Videos"
+TvShowTitles="TvShowTitles"
+
+def ActivateWindow(w):
+    print "ActivateWindows:", w
 
 class XBMC(RPC):
     SystemPlatformLinux= True
@@ -73,34 +81,122 @@ class XBMC(RPC):
     SystemKernelVersion= "Gilles"
     SystemBuildVersion= "0.0"
 
+def seconds2time(ss):
+    h= int( ss//3600 )
+    ss= ss%3600
+    m= int( ss//60 )
+    ss= ss%60
+    s= int( ss )
+    ss= ss%1
+    ms= int( ss*1000)
+    return { "hours": h, "minutes": m, "seconds": s, "milliseconds": ms }
+
+def vvlc(**kwargs):
+    root= "http://:vlc@127.0.0.1:8080/requests/status.json?"
+    args=[]
+    for t in kwargs.items():
+        args.append(t[0]+"="+t[1])
+    print "&".join(args)
+    return requests.get(root + "&".join(args)).json()
+
 class Player(RPC):
-    print "Init Player class ----------------"
     playerid=0
-    _type="video"
+    type=""
+    audiostreams=[]
+    canseek= True
+    currentaudiostream={}
+    currentsubtitle=None
+    partymode= False
+    playlistid= 0
+    position= 1
+    repeat= "off"
+    shuffled= False
+    speed= 1
+    subtitleenabled= False
+    subtitles=[]
+    time= { "hours": 0, "minutes":0, "seconds": 0, "milliseconds":0 }
+    totaltime= { "hours": 0, "minutes":0, "seconds": 0, "milliseconds":0 }
     itemid=-1
+    duration=0
     @classmethod
     def GetActivePlayers(c):
-        return [{"playerid":c.playerid, "type":c._type}]
+        return [{"playerid":c.playerid, "type":c.type}]
     @classmethod
     def Open(c,item):
-        c.itemid= item["songid"]
+        c.itemid= item["songid"]-1
         s= AudioLibrary.songs[ c.itemid ]
         r= vlc.play(s["file"])
-        c._type= "audio"
+        c.type= "audio"
         c.playerid=0
-        stream= r["information"]["category"]["Stream 0"]
-        XBMC.MusicPlayerCodec= stream["Codec"]
-        XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
-        XBMC.MusicPlayerBitRate= stream["Bitrate"]
+        try:
+            stream= r["information"]["category"]["Stream 0"]
+            XBMC.MusicPlayerCodec= stream["Codec"]
+            XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
+            XBMC.MusicPlayerBitRate= stream["Bitrate"]
+        except KeyError as e:
+            print e,r
+
+    @classmethod
+    def PlayPause(c,playerid):
+        s=vlc.pause()
+        if s["state"]=="paused":
+            c.speed= 0
+        elif s["state"]=="playing":
+            c.speed= 1
+        return c.speed
+    @classmethod
+    def Stop(c,playerid):
+        vvlc(command="pl_stop")
+
+    @classmethod
+    def SetRepeat(c,playerid,repeat):
+        print "repeat:", repeat
+        if repeat=="one":
+            vvlc(command="pl_loop")
+        elif repeat=="all":
+            vvlc(command="pl_repeat")
+        c.repeat= repeat
+
+    @classmethod
+    def SetShuffle(c,playerid,shuffle):
+        vvlc(command="pl_random")
+        return "toggle"
+
+    @classmethod
+    def Seek(c,playerid,value):
+        print value, c.duration
+        vvlc(command="seek",val=str(int(value*c.duration//100)))
+        r= c.Get(["totaltime","percentage","time"] )
+        print r
+        return r
 
     @classmethod
     def GetItem(c,playerid,properties=[]):
         s= AudioLibrary.songs[ c.itemid ]
-        r= subdict( s, properties)
-        return r
+        r= subdict( s, set(properties) )
+        r["label"]= s["title"]
+        return { "item":r }
+
     @classmethod
     def GetProperties(c,playerid,properties):
-        return subdict( vlc.status(), properties)
+        s= vlc.status();
+        if s["loop"]:
+            c.repeat="on"
+        elif s["repeat"]:
+            c.repeat="all"
+        else:
+            c.repeat="off"
+        c.duration= s["length"]
+        c.percentage=s["position"] 
+        c.time= seconds2time(s["position"]*s["length"])
+        c.totaltime= seconds2time(s["length"])
+        c.shuffled= s["random"]
+        if s["state"]=="stopped":
+            c.position=0
+        elif s["state"]=="playing":
+            c.position=1
+        properties.append("type")
+        return c.Get(properties)
 
 class VideoLibrary(RPC):
     musicvideos= [ { "musicvideoid":1, "album":"emerald" } ]
@@ -146,6 +242,16 @@ class TVLibrary(RPC):
     def GetMovies(c,**p):
         return [ { "title": "Hello", "file":"hello.Avi" } ]
 
+class Playlist(RPC):
+    lists={}
+    @classmethod
+    def GetItems(c,playlistid, limits, properties=[]):
+        print playlistid
+        v=[]
+        if c.lists.has_key(playlistid):
+            v= c.lists[playlistid]
+        return { "items": v, "limits":{"total":len(v)} }
+
 class Files(RPC):
     @classmethod
     def GetSources(c,**p):
@@ -160,12 +266,17 @@ def handleudp():
 def execute(j):
     c,m= j["method"].split(".")
     C= globals()[c]
-    if j.has_key("params"):
-        r=getattr(C,m)(**j["params"])
-        print c,m,j["params"],":",r,C
-        return r
-    else:
-        r= getattr(C,m)()
-        print c,m,":",r,C
-        return r
+    try:
+        if j.has_key("params"):
+            r=getattr(C,m)(**j["params"])
+            #       print c,m,j["params"],":",r
+            return r
+        else:
+            r= getattr(C,m)()
+            #        print c,m,":",r
+            return r
+    except AttributeError as e:
+        print e, j
+    except TypeError as e:
+        print e, j
 

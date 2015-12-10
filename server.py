@@ -32,9 +32,8 @@ def post( d ):
         print e
         return Response( "", mimetype='application/json')
     r= json.dumps(r)
+#    print r
     return Response(  r, mimetype='application/json')
-
-yopg=None
 
 def get(d):
     if  d=="jsonrpc":
@@ -42,8 +41,6 @@ def get(d):
     idx=d.find("/")
     if idx<0:
         return Response( "", mimetype='text/plain' )        
-    global yopg
-    yopg= d
     try:
         with open( d, "rb" ) as inp:
             return Response( inp.read(), mimetype='image/jpeg' )
@@ -57,11 +54,11 @@ def app(request):
     if request.method=="POST":
         return post(request.data)
     elif request.method=="GET":
-        yop=request
         print "Get:", request.data, request.full_path
         return get(request.full_path[1:-1])
    
 server= make_server('192.168.0.13', 80, app)
+server.protocol_version= "HTTP/1.1"
 print "server started"
 ss= [ server.socket, event.udp, event.tcp ]
 def close():
@@ -78,7 +75,7 @@ def filehash(file):
         return sha1(inp.read()).hexdigest()
 
 libs= { yamc:"", vlc:"" }
-print libs
+
 while(1):
     rl = select( ss, [], [])
     for i in libs.items():
@@ -98,5 +95,4 @@ while(1):
             event.handletcp()
         else:
             print "bad select", r
- #   event.run()
 
