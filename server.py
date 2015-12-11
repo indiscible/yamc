@@ -56,11 +56,17 @@ def app(request):
     elif request.method=="GET":
         print "Get:", request.data, request.full_path
         return get(request.full_path[1:-1])
-   
-server= make_server('192.168.0.13', 80, app)
+
+if not locals().has_key("ss"):   
+    server= make_server('192.168.0.13', 80, app)
+    udp = event.make_udp()
+    tcp= event.make_tcp()
+    global ss
+    ss= [ server.socket, udp, tcp ]
+    print "server started"
+
 server.protocol_version= "HTTP/1.1"
-print "server started"
-ss= [ server.socket, event.udp, event.tcp ]
+
 def close():
     for s in ss:
         s.close()
@@ -74,25 +80,28 @@ def filehash(file):
     with open(file,"rb") as inp:
         return sha1(inp.read()).hexdigest()
 
-libs= { yamc:"", vlc:"" }
+def go():
+    libs= { yamc:"", vlc:"", event:"" }
+    while(1):
+        rl = select( ss, [], [])
+        for i in libs.items():
+            h= filehash(i[0].__name__+".py")
+            if h!=i[1]:
+                print "new hash: ", i[0].__name__
+                reload(i[0])
+                libs[i[0]]= h
+        for r in rl[0]:
+            if r==server.socket:
+                server.handle_request()
+            elif r==udp:
+                print "udp"
+                yamc.handleudp(udp)
+            elif r==tcp:
+                print "tcp"
+                event.handletcp(tcp)
+            else:
+                print "bad select", r
+                        
 
-while(1):
-    rl = select( ss, [], [])
-    for i in libs.items():
-        h= filehash(i[0].__name__+".py")
-        if h!=i[1]:
-            print "new hash: ", i[0].__name__
-            reload(i[0])
-            libs[i[0]]= h
-    for r in rl[0]:
-        if r==server.socket:
-            server.handle_request()
-        elif r==event.udp:
-            print "udp"
-            yamc.handleudp()
-        elif r==event.tcp:
-            print "tcp"
-            event.handletcp()
-        else:
-            print "bad select", r
 
+go()
