@@ -22,6 +22,7 @@ class RPC(object):
             
     @classmethod
     def GetProperties(c,properties,**o):
+        print c,properties
         return c.Get(properties)
 
     @classmethod
@@ -59,14 +60,11 @@ class Application(RPC):
     version= { 'major':15, 'tag':'stable', 'minor':2,'revision':'unknown'}
     volume= 50
     muted= False
-    
-    @classmethod
-    def OnVolumeChanged(c):
-        event.post( { "muted": c.muted, "volume": c.volume } )
-
+            
 def Mute():
     Application.muted= not Application.muted
-    Application.OnVolumeChanged();
+    event.post( "OnVolumeChanged", 
+                { "muted": c.muted, "volume": c.volume } )
 
 def skipminus():
     Player.SkipMinus();
@@ -118,27 +116,41 @@ class vlc:
     @classmethod
     def play(c,i):
         p= c.playlist()
-        print p
         node= p["children"][0]["children"][i]["id"]
         return c.command("pl_play",id=node)
         
 class Playlist(RPC):
-    lists={}
+    lists= json.load(open("database/lists.json","r"))
+    @classmethod
+    def save(c):
+        with open("database/lists.json","w") as out:
+            json.dump(c.lists, out)
+
     @classmethod
     def GetItems(c,playlistid, limits, properties=[]):
-        print playlistid
         v=[]
         if c.lists.has_key(playlistid):
             v= c.lists[playlistid]
         return { "items": v, "limits":{"total":len(v)} }
     @classmethod
     def Clear(c,playlistid):
+        c.lists[playlistid]= []
+        c.save()
         vlc.command("pl_empty")
     @classmethod
     def Add(c,playlistid,item):
+        sid= item["songid"]
+        pl= c.lists[playlistid]
+        pl.append( AudioLibrary.songs[sid-1] )
         print vlc.command("in_enqueue",
-             input= AudioLibrary.songs[item["songid"]-1]["file"])
-        
+             input= AudioLibrary.songs[sid-1]["file"])
+        event.post( "Playlist.OnAdd",
+                    { "items": { "id": sid, "type":"song" },
+                      "playlistid": playlistid,
+                      "position": len(pl)-1 } )
+        c.save()
+        return "OK"
+
 class Player(RPC):
     playerid=0
     type=""
@@ -148,7 +160,7 @@ class Player(RPC):
     currentsubtitle=None
     partymode= False
     playlistid= 0
-    position= 1
+    position= 0
     repeat= "off"
     shuffled= False
     speed= 1
@@ -164,15 +176,20 @@ class Player(RPC):
     @classmethod
     def Open(c,item):
         if item.has_key("playlistid"):
-            c.itemid= item["position"]
-            print "open:", item["position"]
-            r= vlc.play(item["position"])
+            c.playlistid=item["playlistid"]
+            c.position= item["position"]
+            pl= Playlist.lists[c.playlistid]
+            c.itemid= pl[c.position]["songid"]-1
+            r= vlc.play(c.position)
         else:
             c.itemid= item["songid"]-1
             s= AudioLibrary.songs[ c.itemid ]
             r= vlc.command("in_play", input= s["file"])
         c.type= "audio"
         c.playerid=0
+        event.post( "Player.OnPlay", 
+                    { "items": { "id": c.itemid, "type":"song" },
+                      "player": { "playerid": c.playerid, "speed":c.speed } } )
         try:
             stream= r["information"]["category"]["Stream 0"]
             XBMC.MusicPlayerCodec= stream["Codec"]
@@ -199,6 +216,9 @@ class Player(RPC):
     def SkipMinus(c):
         vlc.command("pl_previous")
     @classmethod
+    def GoTo(c,playerid, to ):
+        c.Open({ "playlistid":0, "position":to })
+    @classmethod
     def SetRepeat(c,playerid,repeat):
         print "repeat:", repeat
         if repeat=="one":
@@ -210,7 +230,7 @@ class Player(RPC):
     @classmethod
     def SetShuffle(c,playerid,shuffle):
         vlc.command("pl_random")
-        return "toggle"
+        return "OK"
 
     @classmethod
     def Seek(c,playerid,value):
@@ -224,7 +244,6 @@ class Player(RPC):
     def GetItem(c,playerid,properties=[]):
         s= AudioLibrary.songs[ c.itemid ]
         r= subdict( s, set(properties) )
-        r["label"]= s["title"]
         return { "item":r }
 
     @classmethod
@@ -306,6 +325,7 @@ def handleudp(s):
 def execute(j):
     c,m= j["method"].split(".")
     C= globals()[c]
+#    print c,m
     try:
         if j.has_key("params"):
             r=getattr(C,m)(**j["params"])
