@@ -9,13 +9,28 @@ cmd='XBMC\x02\x00\x00\n\x00\x00\x00\x01\x00\x00\x00\x01\x00\x08P\x80\x19+\x00\x0
 def unpackstring(b):
     return str( b[:b.find('\x00')])
 
+
 def button(p):
-    code,flag,amount= struct.unpack("!iii",p[:12])
-    device,name= p[12:].split('\x00')
+    flags= { 0x01: "USE_NAME",
+             0x02: "DOWN",
+             0x04: "UP",
+             0x08: "USE_AMOUNT",
+             0x10: "QUEUE",
+             0X20: "NO_REPEAT",
+             0X40: "VKEY",
+             0X100: "AXISSINGLE"
+    }
+    print p[:6]
+    print p[6:]
+    code,flag,amount= struct.unpack("!hhh",p[:6])
+    device,name,other= p[6:].split('\x00')
     print "button:", p
     print code,flag,amount,device,name
+    print { v for k,v in flags.items() if flag&k }
+
 def hello(p):
     print "Hello: ", p
+
 def execute(p,g,l):
     h= header.unpack(p[:32])
     print h
@@ -50,21 +65,25 @@ def post(d):
         print "remove client:", c
         clients.pop(b)
 
-tcp= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-tcp.bind(('192.168.0.13',9090))
-tcp.listen(5)
-tcp.settimeout(1)
+def make_tcp():
+    s= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('192.168.0.13',9090))
+    s.listen(5)
+    s.settimeout(1)
+    return s
 
-def handletcp():
+def handletcp(tcp):
     (client,addr)= tcp.accept()
     print "new client:", client, addr
     clients[client]= addr
-    
-udp= socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp.bind( ('',9777))
-udp.settimeout(1)
 
-def handleudp(g=globals(),l=locals()):
+def make_udp():    
+    s= socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind( ('',9777))
+    s.settimeout(1)
+    return s
+
+def handleudp(udp,g=globals(),l=locals()):
     cmd,addr= udp.recvfrom(1024)
     execute(cmd,g,l)
 
