@@ -62,3 +62,5 @@ target/
 log.txt
 
 /tags
+/database
+/playeritems.json

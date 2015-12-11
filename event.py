@@ -53,12 +53,13 @@ def execute(p,g,l):
     else:
         print "unknown command:", p
 
+if not locals().has_key("clients"):
+    global clients
+    clients={}
 
-clients={}
-
-def post(d):
+def post(m,d):
     msg= json.dumps( { "jsonrpc":"2.0",
-                         "method":"Application.OnVolumeChanged",
+                         "method": m,
                          "params": { "data": d, "sender":"xbmc" } } )
     print msg
     bads=[]
