@@ -68,6 +68,12 @@ def Mute():
     Application.muted= not Application.muted
     Application.OnVolumeChanged();
 
+def skipminus():
+    Player.SkipMinus();
+
+def skipplus():
+    Player.SkipPlus()
+
 MusicLibrary= "Hello"
 Videos="Videos"
 TvShowTitles="TvShowTitles"
@@ -98,10 +104,9 @@ class vlc:
         args=[cc]
         for t in kwargs.items():
             args.append(t[0]+"="+t[1])
-        print "&".join(args)
-        return requests.get(c.root + 
-                            "status.json?command=" +
-                            "&".join(args)).json()
+        req= c.root + "status.json?command=" + "&".join(args)
+        print req
+        return requests.get(req).json()
     @classmethod
     def playlist(c):
         return requests.get( c.root + "playlist.json" ).json()
@@ -187,7 +192,12 @@ class Player(RPC):
     @classmethod
     def Stop(c,playerid):
         vlc.command("pl_stop")
-
+    @classmethod
+    def SkipPlus(c):
+        vlc.command("pl_next")
+    @classmethod
+    def SkipMinus(c):
+        vlc.command("pl_previous")
     @classmethod
     def SetRepeat(c,playerid,repeat):
         print "repeat:", repeat
