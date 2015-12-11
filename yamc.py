@@ -91,14 +91,49 @@ def seconds2time(ss):
     ms= int( ss*1000)
     return { "hours": h, "minutes": m, "seconds": s, "milliseconds": ms }
 
-def vvlc(**kwargs):
-    root= "http://:vlc@127.0.0.1:8080/requests/status.json?"
-    args=[]
-    for t in kwargs.items():
-        args.append(t[0]+"="+t[1])
-    print "&".join(args)
-    return requests.get(root + "&".join(args)).json()
+class vlc:
+    root= "http://:vlc@127.0.0.1:8080/requests/"
+    @classmethod
+    def command(c, cc,**kwargs):
+        args=[cc]
+        for t in kwargs.items():
+            args.append(t[0]+"="+t[1])
+        print "&".join(args)
+        return requests.get(c.root + 
+                            "status.json?command=" +
+                            "&".join(args)).json()
+    @classmethod
+    def playlist(c):
+        return requests.get( c.root + "playlist.json" ).json()
 
+    @classmethod
+    def status(c):
+        return requests.get( c.root + "status.json" ).json()
+
+    @classmethod
+    def play(c,i):
+        p= c.playlist()
+        print p
+        node= p["children"][0]["children"][i]["id"]
+        return c.command("pl_play",id=node)
+        
+class Playlist(RPC):
+    lists={}
+    @classmethod
+    def GetItems(c,playlistid, limits, properties=[]):
+        print playlistid
+        v=[]
+        if c.lists.has_key(playlistid):
+            v= c.lists[playlistid]
+        return { "items": v, "limits":{"total":len(v)} }
+    @classmethod
+    def Clear(c,playlistid):
+        vlc.command("pl_empty")
+    @classmethod
+    def Add(c,playlistid,item):
+        print vlc.command("in_enqueue",
+             input= AudioLibrary.songs[item["songid"]-1]["file"])
+        
 class Player(RPC):
     playerid=0
     type=""
@@ -123,9 +158,14 @@ class Player(RPC):
         return [{"playerid":c.playerid, "type":c.type}]
     @classmethod
     def Open(c,item):
-        c.itemid= item["songid"]-1
-        s= AudioLibrary.songs[ c.itemid ]
-        r= vlc.play(s["file"])
+        if item.has_key("playlistid"):
+            c.itemid= item["position"]
+            print "open:", item["position"]
+            r= vlc.play(item["position"])
+        else:
+            c.itemid= item["songid"]-1
+            s= AudioLibrary.songs[ c.itemid ]
+            r= vlc.command("in_play", input= s["file"])
         c.type= "audio"
         c.playerid=0
         try:
@@ -134,11 +174,11 @@ class Player(RPC):
             XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
             XBMC.MusicPlayerBitRate= stream["Bitrate"]
         except KeyError as e:
-            print e,r
+            print "KeyError:", e, r
 
     @classmethod
     def PlayPause(c,playerid):
-        s=vlc.pause()
+        s=vlc.command("pl_pause")
         if s["state"]=="paused":
             c.speed= 0
         elif s["state"]=="playing":
@@ -146,26 +186,26 @@ class Player(RPC):
         return c.speed
     @classmethod
     def Stop(c,playerid):
-        vvlc(command="pl_stop")
+        vlc.command("pl_stop")
 
     @classmethod
     def SetRepeat(c,playerid,repeat):
         print "repeat:", repeat
         if repeat=="one":
-            vvlc(command="pl_loop")
+            vlc.command("pl_loop")
         elif repeat=="all":
-            vvlc(command="pl_repeat")
+            vlc.command("pl_repeat")
         c.repeat= repeat
 
     @classmethod
     def SetShuffle(c,playerid,shuffle):
-        vvlc(command="pl_random")
+        vlc.command("pl_random")
         return "toggle"
 
     @classmethod
     def Seek(c,playerid,value):
         print value, c.duration
-        vvlc(command="seek",val=str(int(value*c.duration//100)))
+        vlc.command("seek",val=str(int(value*c.duration//100)))
         r= c.Get(["totaltime","percentage","time"] )
         print r
         return r
@@ -242,16 +282,6 @@ class TVLibrary(RPC):
     def GetMovies(c,**p):
         return [ { "title": "Hello", "file":"hello.Avi" } ]
 
-class Playlist(RPC):
-    lists={}
-    @classmethod
-    def GetItems(c,playlistid, limits, properties=[]):
-        print playlistid
-        v=[]
-        if c.lists.has_key(playlistid):
-            v= c.lists[playlistid]
-        return { "items": v, "limits":{"total":len(v)} }
-
 class Files(RPC):
     @classmethod
     def GetSources(c,**p):
@@ -260,8 +290,8 @@ class Files(RPC):
     def GetDirectory(c,**p):
         return {}
     
-def handleudp():
-    event.handleudp(globals(), locals())
+def handleudp(s):
+    event.handleudp(s,globals(), locals())
 
 def execute(j):
     c,m= j["method"].split(".")
@@ -269,14 +299,13 @@ def execute(j):
     try:
         if j.has_key("params"):
             r=getattr(C,m)(**j["params"])
-            #       print c,m,j["params"],":",r
+#            print c,m,j["params"],":",r
             return r
         else:
             r= getattr(C,m)()
-            #        print c,m,":",r
+#            print c,m,":",r
             return r
     except AttributeError as e:
         print e, j
     except TypeError as e:
         print e, j
-
