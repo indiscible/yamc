@@ -1,7 +1,7 @@
 import struct
 import json
 import socket
-
+import sys
 header= struct.Struct("!4scchiihi10c")
 
 cmd='XBMC\x02\x00\x00\n\x00\x00\x00\x01\x00\x00\x00\x01\x00\x08P\x80\x19+\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01Mute()\x00'
@@ -26,7 +26,9 @@ def button(p):
     device,name,other= p[6:].split('\x00')
     print "button:", p
     print code,flag,amount,device,name
-    print { v for k,v in flags.items() if flag&k }
+    f= { v for k,v in flags.items() if flag&k }
+    if "DOWN" in f:
+        return name+"()"
 
 def hello(p):
     print "Hello: ", p
@@ -41,7 +43,11 @@ def execute(p,g,l):
         print "execute: ", c
         eval(c,g,l)
     elif h[3]==3:
-        button( p[32:] )
+        b=button( p[32:] )
+        try:
+            eval(b,g,l)
+        except:
+            print "button error", sys.exc_info()[0],":", b
     elif h[3]==5:
         print "Ping"
     else:
