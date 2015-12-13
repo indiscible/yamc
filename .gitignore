@@ -59,8 +59,5 @@ docs/_build/
 # PyBuilder
 target/
 
-log.txt
-
-/tags
-/database
-/playeritems.json
+database
+image
