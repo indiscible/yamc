@@ -70,14 +70,15 @@ def post(m,d):
             bads.append(c)
     for b in bads:
         print "remove client:", c
-        clients.pop(b)
+        clients.pop
 
 def make_tcp():
     s= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('192.168.0.13',9090))
+    s.bind(('192.168.0.15',9090))
     s.listen(5)
     s.settimeout(1)
     return s
+
 
 def handletcp(tcp):
     (client,addr)= tcp.accept()

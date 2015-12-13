@@ -1,51 +1,79 @@
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 from os import walk
+from os import path
 from json import dump
 from hashlib import sha1
 
-src= "C:\Music"
+src= "/mnt/samsung/music"
 dst= "database\\"
 thumbs= "image\\"
 
 dumpdb= True
 
 songs=[]
-for (path,ndir,nfile) in walk(src):
+for (ppath,ndir,nfile) in walk(src):
     for name in nfile:
-        songs.append(path+"\\"+name)
+        songs.append(ppath+"\\"+name)
 
 open(dst+"songs.txt","w").writelines(songs)
 
 def Thumbnail(img):
     if img:
         h= sha1( img.data ).hexdigest();
-        with open(thumbs+h,"wb") as out:
+        with open( path.join(thumbs,h),"wb") as out:
             out.write(img.data)
         return h
     return ""
 
 songs=[]
 def Song(f):
+    if path.splitext(f)[1]!='.mp3':
+        return
+    print f
     i= EasyID3(f)
+    d3= i._EasyID3__id3
     s={
         "title": i["title"][0],
-        "artist": i["artist"][0],
-        "year": int(i["date"][0][:4]),
-        "album": i["album"][0],
-        "track": int(i["tracknumber"][0].split("/")[0]),
-        "duration": int(i["length"][0])/1000,
-        "musicbrainztrackid": i["musicbrainz_trackid"][0],
-        "musicbrainzartistid": i["musicbrainz_artistid"][0],
-        "musicbrainzalbumid": i["musicbrainz_albumid"][0],
-        "musicbrainzalbumartistid": i["musicbrainz_albumartistid"][0],
+        "artist": "",
+        "year": 0,
+        "album": 0,
+        "track": 0,
+        "musicbrainztrackid": "" ,
+#i["musicbrainz_trackid"][0],
+        "musicbrainzartistid": "",
+#i["musicbrainz_artistid"][0],
+        "musicbrainzalbumid": "" ,
+#i["musicbrainz_albumid"][0],
+        "musicbrainzalbumartistid": "",
+#i["musicbrainz_albumartistid"][0],
         "file": f,
-        "disc": int(i["discnumber"][0].split("/")[0]),
-        "thumbnail": Thumbnail(i._EasyID3__id3["APIC:"]),
-        "rating":0
+        "disc": 0,
+        "thumbnail":"",
+        "rating":0,
+        "duration":0
         }
+    if i.has_key('length'):
+        s["duration"]= int(i["length"][0])/1000
     print s["duration"]
+<<<<<<< HEAD
+    if d3.has_key('APIC:'):
+        s["thumbnail"]= Thumbnail(d3["APIC:"])
+    if i.has_key("date"):
+        s["year"]= int(i["date"][0][:4])
+    if i.has_key("discnumber"):
+        s["disc"]= int(i["discnumber"][0].split("/")[0])
+    if i.has_key("album"):
+        s["album"]= i["album"][0]
+    if i.has_key("tracknumber"):
+        s["track"]=int(i["tracknumber"][0].split("/")[0])
+    if i.has_key("artist"):
+        s["artist"]=i["artist"][0]
+    songs.append(s)
+    s["songid"]= len(songs)
+=======
     s["songid"]= len(songs)+1
+>>>>>>> 27c1d694ecdb44144726594dae3e5b799ab135f1
     s["artistid"]= Artist(s)
     s["albumid"]= Album(s)
     songs.append(s)
@@ -93,9 +121,9 @@ def Album(s):
     albumid[ s["album"] ]= newid
     return newid
 
-for (path,ndir,nfile) in walk(src):
+for (ppath,ndir,nfile) in walk(src):
     for name in nfile:
-        Song(path+"\\"+name)
+        Song( path.join(ppath,name) )
          
 if dumpdb:
     dump( songs, open(dst+"songs.json","w"))
