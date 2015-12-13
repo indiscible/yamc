@@ -57,24 +57,26 @@ def app(request):
         print "Get:", request.data, request.full_path
         return get(request.full_path[1:-1])
 
-if not locals().has_key("ss"):   
+def init():
     server= make_server('192.168.0.13', 80, app)
-    udp = event.make_udp()
-    tcp= event.make_tcp()
-    global ss
-    ss= [ server.socket, udp, tcp ]
+    server.protocol_version= "HTTP/1.1"
+    return server,[ server.socket, event.make_udp(), event.make_tcp() ]
+    
+if not locals().has_key("server"):
+    server,ss= init()
     print "server started"
-
-server.protocol_version= "HTTP/1.1"
 
 def close():
     for s in ss:
         s.close()
+    ss= None
+    print "serve stopped"
 
 def sigint(signal,frame):
     close()
     sys.exit(0)
 signal.signal(signal.SIGINT,sigint)
+
 
 def filehash(file):
     with open(file,"rb") as inp:
@@ -91,14 +93,14 @@ def go():
                 reload(i[0])
                 libs[i[0]]= h
         for r in rl[0]:
-            if r==server.socket:
+            if r==ss[0]:
                 server.handle_request()
-            elif r==udp:
+            elif r==ss[1]:
                 print "udp"
-                yamc.handleudp(udp)
-            elif r==tcp:
+                yamc.handleudp(ss[1])
+            elif r==ss[2]:
                 print "tcp"
-                event.handletcp(tcp)
+                event.handletcp(ss[2])
             else:
                 print "bad select", r
                         
