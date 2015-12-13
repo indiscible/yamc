@@ -4,6 +4,8 @@ import json
 import vlc
 import time
 import requests
+from os import path
+from urllib import unquote
 
 class JSONRPC:
     @staticmethod
@@ -22,7 +24,6 @@ class RPC(object):
             
     @classmethod
     def GetProperties(c,properties,**o):
-        print c,properties
         return c.Get(properties)
 
     @classmethod
@@ -60,24 +61,37 @@ class Application(RPC):
     version= { 'major':15, 'tag':'stable', 'minor':2,'revision':'unknown'}
     volume= 50
     muted= False
-            
-def Mute():
-    Application.muted= not Application.muted
-    event.post( "OnVolumeChanged", 
-                { "muted": c.muted, "volume": c.volume } )
+    @classmethod
+    def VolumeChanged(c):
+        event.post( "OnVolumeChanged", 
+                    { "muted": c.muted, "volume": c.volume } )
 
-def skipminus():
-    Player.SkipMinus();
+    @classmethod
+    def SetMute(c,mute):
+        c.muted= not c.muted
+        if c.muted:
+            vlc.command("volume",val=0)
+        else:
+            vlc.command("volume",val=c.volume)
+        c.VolumeChanged()
 
-def skipplus():
-    Player.SkipPlus()
-
+    @classmethod
+    def SetVolume(c,val):
+        c.volume=val
+        vlc.command("volume",val=c.volume)
+        c.VolumeChanged()
+        
+def Mute(): Application.SetMute("toggle")
+def skipminus(): Player.Minus()
+def skipplus(): Player.Plus()
+def forward(): vlc.command("seek",val="+5")
+def reverse(): vlc.command("seek",val="-5")
+def volumeminus(): Application.SetVolume( Application.volume-16 )
+def volumeplus(): Application.SetVolume( Application.volume+16 )
 MusicLibrary= "Hello"
 Videos="Videos"
 TvShowTitles="TvShowTitles"
-
-def ActivateWindow(w):
-    print "ActivateWindows:", w
+def ActivateWindow(w): print "ActivateWindows:", w
 
 class XBMC(RPC):
     SystemPlatformLinux= True
@@ -101,7 +115,7 @@ class vlc:
     def command(c, cc,**kwargs):
         args=[cc]
         for t in kwargs.items():
-            args.append(t[0]+"="+t[1])
+            args.append(t[0]+"="+str(t[1]))
         req= c.root + "status.json?command=" + "&".join(args)
         print req
         return requests.get(req).json()
@@ -118,42 +132,62 @@ class vlc:
         p= c.playlist()
         node= p["children"][0]["children"][i]["id"]
         return c.command("pl_play",id=node)
+
+
         
 class Playlist(RPC):
-    lists= json.load(open("database/lists.json","r"))
+    items=[]
+    node=[]
+    dirty=True
+    count=0
     @classmethod
-    def save(c):
-        with open("database/lists.json","w") as out:
-            json.dump(c.lists, out)
+    def refresh(c):
+        if not c.dirty: return
+        c.items=[]
+        c.node=[]
+        f2i={}
+        for s in AudioLibrary.songs: f2i[s["file"]]= s["songid"]
+        for i in vlc.playlist()["children"][0]["children"]:
+            uri= path.abspath(unquote(i["uri"][8:]))
+            if f2i.has_key(uri):
+                c.node.append( int(i["id"]) )
+                c.items.append( AudioLibrary.songs[ f2i[uri]-1 ] )
+        c.dirty= False
+        print c.node
 
     @classmethod
     def GetItems(c,playlistid, limits, properties=[]):
-        v=[]
-        if c.lists.has_key(playlistid):
-            v= c.lists[playlistid]
-        return { "items": v, "limits":{"total":len(v)} }
+        c.refresh()
+        return c.GetList("items",properties,limits)
+        
     @classmethod
     def Clear(c,playlistid):
-        c.lists[playlistid]= []
-        c.save()
         vlc.command("pl_empty")
+        c.dirty= True
+        c.count=0
+        return "OK"
+
     @classmethod
     def Add(c,playlistid,item):
-        sid= item["songid"]
-        pl= c.lists[playlistid]
-        pl.append( AudioLibrary.songs[sid-1] )
-        print vlc.command("in_enqueue",
-             input= AudioLibrary.songs[sid-1]["file"])
-        event.post( "Playlist.OnAdd",
-                    { "items": { "id": sid, "type":"song" },
-                      "playlistid": playlistid,
-                      "position": len(pl)-1 } )
-        c.save()
+        if "file" in item:
+            id= item["file"].split("video_id")[1]
+            vlc.command("in_play",input="http://youtube.com/watch?v="+id)
+        else:
+            print item
+            sid= item["songid"]
+            vlc.command("in_enqueue",
+                        input= AudioLibrary.songs[sid-1]["file"])
+            event.post( "Playlist.OnAdd",
+                        { "items": { "id": sid, "type":"song" },
+                          "playlistid": playlistid,
+                          "position": c.count } )
+            c.count=c.count+1
+            c.dirty= True
         return "OK"
 
 class Player(RPC):
     playerid=0
-    type=""
+    type="audio"
     audiostreams=[]
     canseek= True
     currentaudiostream={}
@@ -168,28 +202,45 @@ class Player(RPC):
     subtitles=[]
     time= { "hours": 0, "minutes":0, "seconds": 0, "milliseconds":0 }
     totaltime= { "hours": 0, "minutes":0, "seconds": 0, "milliseconds":0 }
-    itemid=-1
     duration=0
+    item={}
+    @classmethod
+    def OnPlay(c):
+        event.post( "Player.OnPlay", 
+                    { "items": { "id": c.item["songid"], "type":"song" },
+                      "player": { "playerid": c.playerid, "speed":c.speed } } )
+
+    @classmethod
+    def Plus(c):
+        vlc.command("pl_next")
+        c.OnPlay()
+
+    @classmethod
+    def Minus(c):
+        vlc.command("pl_previous")
+        c.OnPlay()
+
     @classmethod
     def GetActivePlayers(c):
+        print c.playerid, c.type
         return [{"playerid":c.playerid, "type":c.type}]
     @classmethod
     def Open(c,item):
         if item.has_key("playlistid"):
-            c.playlistid=item["playlistid"]
+            Playlist.refresh()
+            print item
             c.position= item["position"]
-            pl= Playlist.lists[c.playlistid]
-            c.itemid= pl[c.position]["songid"]-1
-            r= vlc.play(c.position)
+            c.item= Playlist.items[ c.position ]
+            print c.item
+            r= vlc.command("pl_play",id=Playlist.node[ c.position ])
         else:
-            c.itemid= item["songid"]-1
-            s= AudioLibrary.songs[ c.itemid ]
-            r= vlc.command("in_play", input= s["file"])
+            print item
+            c.item= AudioLibrary.songs[ item["songid"]-1 ]
+            r= vlc.command("in_play", input= c.item["file"])
+            Playlist.dirty= True
         c.type= "audio"
         c.playerid=0
-        event.post( "Player.OnPlay", 
-                    { "items": { "id": c.itemid, "type":"song" },
-                      "player": { "playerid": c.playerid, "speed":c.speed } } )
+        c.OnPlay()
         try:
             stream= r["information"]["category"]["Stream 0"]
             XBMC.MusicPlayerCodec= stream["Codec"]
@@ -199,25 +250,27 @@ class Player(RPC):
             print "KeyError:", e, r
 
     @classmethod
-    def PlayPause(c,playerid):
+    def PlayPause(c,playerid,play):
         s=vlc.command("pl_pause")
         if s["state"]=="paused":
             c.speed= 0
         elif s["state"]=="playing":
             c.speed= 1
         return c.speed
+
     @classmethod
     def Stop(c,playerid):
         vlc.command("pl_stop")
+
     @classmethod
-    def SkipPlus(c):
-        vlc.command("pl_next")
-    @classmethod
-    def SkipMinus(c):
-        vlc.command("pl_previous")
+    def SetSpeed(c,playerid,speed):
+        if speed==1:
+            vlc.command("pl_play")
+
     @classmethod
     def GoTo(c,playerid, to ):
         c.Open({ "playlistid":0, "position":to })
+
     @classmethod
     def SetRepeat(c,playerid,repeat):
         print "repeat:", repeat
@@ -235,20 +288,20 @@ class Player(RPC):
     @classmethod
     def Seek(c,playerid,value):
         print value, c.duration
-        vlc.command("seek",val=str(int(value*c.duration//100)))
+        vlc.command("seek",val=int(value*c.duration//100))
         r= c.Get(["totaltime","percentage","time"] )
         print r
         return r
 
     @classmethod
     def GetItem(c,playerid,properties=[]):
-        s= AudioLibrary.songs[ c.itemid ]
-        r= subdict( s, set(properties) )
+        r= subdict( c.item, properties )
         return { "item":r }
 
     @classmethod
     def GetProperties(c,playerid,properties):
         s= vlc.status();
+        Playlist.refresh()
         if s["loop"]:
             c.repeat="on"
         elif s["repeat"]:
@@ -260,11 +313,17 @@ class Player(RPC):
         c.time= seconds2time(s["position"]*s["length"])
         c.totaltime= seconds2time(s["length"])
         c.shuffled= s["random"]
-        if s["state"]=="stopped":
+        n=Playlist.node
+        id= s["currentplid"]
+        if id in n:
+            c.position= n.index(id)
+        else:
             c.position=0
+        c.item= Playlist.items[c.position]
+        if s["state"]=="stopped":
+            c.speed=0
         elif s["state"]=="playing":
-            c.position=1
-        properties.append("type")
+            c.speed=1
         return c.Get(properties)
 
 class VideoLibrary(RPC):
@@ -284,6 +343,7 @@ class AudioLibrary(RPC):
     songs= json.load( open("database/songs.json","r") )
     albums= json.load( open("database/albums.json","r") )
     artists= json.load( open("database/artists.json", "r") )
+    genres= [ {"genreid":1, "title":"rock", "thumbnail":""} ]
     @classmethod
     def GetArtists(c,limits,properties=[]):
         properties.append("artistid")
@@ -301,7 +361,6 @@ class AudioLibrary(RPC):
         return c.GetList("albums",set(properties),limits)
     @classmethod
     def GetSongs(c,limits, properties=[]):
-        print properties
         properties.append("songid")
         properties=["songid","title","track","rating","duration","albumid"]
         return c.GetList("songs",set(properties),limits)
@@ -325,9 +384,10 @@ def handleudp(s):
 def execute(j):
     c,m= j["method"].split(".")
     C= globals()[c]
-#    print c,m
+    print c,m
     try:
         if j.has_key("params"):
+#            print c,m,j["params"]
             r=getattr(C,m)(**j["params"])
 #            print c,m,j["params"],":",r
             return r
