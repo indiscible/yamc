@@ -1,22 +1,24 @@
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
-from os import walk
-from os import path
+from os import path,mkdir,walk
 from json import dump
 from hashlib import sha1
 
 src= "/mnt/samsung/music"
-dst= "database\\"
-thumbs= "image\\"
+dst= "database"
+thumbs= "image"
 
 dumpdb= True
 
+if not path.exists(dst): mkdir(dst)
+if not path.exists(dst): mkdir(thumbs)
+    
 songs=[]
 for (ppath,ndir,nfile) in walk(src):
     for name in nfile:
-        songs.append(ppath+"\\"+name)
+        songs.append(path.join(ppath,name))
 
-open(dst+"songs.txt","w").writelines(songs)
+open(path.join(dst,"songs.txt"),"w").writelines(songs)
 
 def Thumbnail(img):
     if img:
@@ -56,7 +58,6 @@ def Song(f):
     if i.has_key('length'):
         s["duration"]= int(i["length"][0])/1000
     print s["duration"]
-<<<<<<< HEAD
     if d3.has_key('APIC:'):
         s["thumbnail"]= Thumbnail(d3["APIC:"])
     if i.has_key("date"):
@@ -69,11 +70,8 @@ def Song(f):
         s["track"]=int(i["tracknumber"][0].split("/")[0])
     if i.has_key("artist"):
         s["artist"]=i["artist"][0]
-    songs.append(s)
-    s["songid"]= len(songs)
-=======
+
     s["songid"]= len(songs)+1
->>>>>>> 27c1d694ecdb44144726594dae3e5b799ab135f1
     s["artistid"]= Artist(s)
     s["albumid"]= Album(s)
     songs.append(s)
@@ -126,6 +124,6 @@ for (ppath,ndir,nfile) in walk(src):
         Song( path.join(ppath,name) )
          
 if dumpdb:
-    dump( songs, open(dst+"songs.json","w"))
-    dump( artists, open(dst+"artists.json","w"))
-    dump( albums, open(dst+"albums.json","w"))
+    dump( songs, open(path.join(dst,"songs.json"),"w"))
+    dump( artists, open(path.join(dst,"artists.json"),"w"))
+    dump( albums, open(path.join(dst,"albums.json"),"w"))
