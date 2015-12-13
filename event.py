@@ -9,7 +9,6 @@ cmd='XBMC\x02\x00\x00\n\x00\x00\x00\x01\x00\x00\x00\x01\x00\x08P\x80\x19+\x00\x0
 def unpackstring(b):
     return str( b[:b.find('\x00')])
 
-
 def button(p):
     flags= { 0x01: "USE_NAME",
              0x02: "DOWN",
@@ -20,8 +19,8 @@ def button(p):
              0X40: "VKEY",
              0X100: "AXISSINGLE"
     }
-    print p[:6]
-    print p[6:]
+#    print p[:6]
+#   print p[6:]
     code,flag,amount= struct.unpack("!hhh",p[:6])
     device,name,other= p[6:].split('\x00')
     print "button:", p
@@ -48,6 +47,7 @@ def execute(p,g,l):
             eval(b,g,l)
         except:
             print "button error", sys.exc_info()[0],":", b
+            
     elif h[3]==5:
         print "Ping"
     else:
