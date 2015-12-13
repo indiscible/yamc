@@ -61,3 +61,6 @@ target/
 
 database
 image
+log
+record
+*.mp3
