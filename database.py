@@ -5,16 +5,17 @@ from json import dump
 from hashlib import sha1
 
 src= "C:\Music"
+dst= "database\\"
 thumbs= "image\\"
 
-dumpdb= False
+dumpdb= True
 
 songs=[]
 for (path,ndir,nfile) in walk(src):
     for name in nfile:
         songs.append(path+"\\"+name)
 
-open("songs.txt","w").writelines(songs)
+open(dst+"songs.txt","w").writelines(songs)
 
 def Thumbnail(img):
     if img:
@@ -44,10 +45,10 @@ def Song(f):
         "rating":0
         }
     print s["duration"]
-    songs.append(s)
-    s["songid"]= len(songs)
+    s["songid"]= len(songs)+1
     s["artistid"]= Artist(s)
     s["albumid"]= Album(s)
+    songs.append(s)
     
 artistid={}
 artists=[]
@@ -60,9 +61,9 @@ def Artist(s):
         "description": s["artist"],
         "thumbnail": s["thumbnail"]
         } 
-    artists.append(a)
-    newid= len(artists)
+    newid= len(artists)+1
     a["artistid"]=newid
+    artists.append(a)
     artistid[ s["artist"] ]= newid    
     return newid
 
@@ -86,9 +87,9 @@ def Album(s):
          "artistid": s["artistid"],
          "rating":0
          }
-    albums.append(a)
-    newid= len(albums)
+    newid= len(albums)+1
     a["albumid"]=newid
+    albums.append(a)
     albumid[ s["album"] ]= newid
     return newid
 
@@ -97,6 +98,6 @@ for (path,ndir,nfile) in walk(src):
         Song(path+"\\"+name)
          
 if dumpdb:
-    dump( songs, open("songs.json","w"))
-    dump( artists, open("artists.json","w"))
-    dump( albums, open("albums.json","w"))
+    dump( songs, open(dst+"songs.json","w"))
+    dump( artists, open(dst+"artists.json","w"))
+    dump( albums, open(dst+"albums.json","w"))
