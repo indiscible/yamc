@@ -57,7 +57,7 @@ def app(request):
         return get(request.full_path[1:-1])
 
 def init():
-    server= make_server('192.168.0.13', 80, app)
+    server= make_server('', 8001, app)
     server.protocol_version= "HTTP/1.1"
     return server,[ server.socket, event.make_udp(), event.make_tcp() ]
     
@@ -84,6 +84,7 @@ def filehash(file):
 def go():
     libs= { yamc:"", event:"" }
     while(1):
+        print "Waiting for request"
         rl = select( ss, [], [])
         for i in libs.items():
             h= filehash(i[0].__name__+".py")
@@ -93,6 +94,7 @@ def go():
                 libs[i[0]]= h
         for r in rl[0]:
             if r==ss[0]:
+                print "http"
                 server.handle_request()
             elif r==ss[1]:
                 print "udp"

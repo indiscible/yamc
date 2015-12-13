@@ -66,15 +66,17 @@ def post(m,d):
     for c in clients:
         try:
             c.send( msg )
-        except socket.error:
-            bads.append(c)
+        except socket.error as e:
+            print "send error:", clients[c], e
+            if not e.errno == socket.errno.EPIPE:
+                bads.append(c)
     for b in bads:
-        print "remove client:", c
-        clients.pop
+        print "remove client:", b
+        clients.remove(b)
 
 def make_tcp():
     s= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('192.168.0.15',9090))
+    s.bind(('192.168.0.17',9090))
     s.listen(5)
     s.settimeout(1)
     return s
@@ -87,7 +89,7 @@ def handletcp(tcp):
 
 def make_udp():    
     s= socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.bind( ('',9777))
+    s.bind( ('192.168.0.17',9777))
     s.settimeout(1)
     return s
 
