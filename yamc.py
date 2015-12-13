@@ -1,7 +1,6 @@
 import subprocess
 import event
 import json
-import vlc
 import time
 import requests
 from os import path

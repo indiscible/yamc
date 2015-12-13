@@ -1,0 +1,8 @@
+[
+{"jsonrpc":"2.0","id":2,"method":"Player.GetProperties","params":{
+"playerid":0,"properties":[
+"audiostreams","canseek","currentaudiostream","currentsubtitle","partymode","playlistid","position","repeat","shuffled","speed","subtitleenabled","subtitles","time","totaltime","type"]}},
+{"jsonrpc":"2.0","id":3,"method":"Player.GetItem","params":{
+"playerid":0,"properties":[
+"album","albumartist","artist","director","episode","fanart","file","genre","plot","rating","season","showtitle","studio","imdbnumber","tagline","thumbnail","title","track","writer","year","streamdetails","originaltitle","cast","playcount"]}},
+{"jsonrpc":"2.0","id":4,"method":"XBMC.GetInfoLabels","params":{"labels":["MusicPlayer.Codec","MusicPlayer.SampleRate","MusicPlayer.BitRate"]}}]
