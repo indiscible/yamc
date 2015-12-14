@@ -331,8 +331,6 @@ class Player(RPC):
             id= s["currentplid"]
             if id in n:
                 c.position= n.index(id)
-        else:
-            f= s["information"]["category"]["meta"]
         if c.position<len(Playlist.items):        
             c.item= Playlist.items[c.position]
         if s["state"]=="stopped":
@@ -359,28 +357,31 @@ class AudioLibrary(RPC):
     songs= json.load( open("database/songs.json","r") )
     albums= json.load( open("database/albums.json","r") )
     artists= json.load( open("database/artists.json", "r") )
-    genres= [ {"genreid":1, "title":"rock", "thumbnail":""} ]
+    genres= json.load( open("database/genres.json", "r") )
+
     @classmethod
     def GetArtists(c,limits,properties=[]):
         properties.append("artistid")
         properties.append("artist")
-        properties= ["artist","artistid","thumbnail"]
+        properties.append("genre")
         return c.GetList("artists",set(properties),limits)
+
     @classmethod
     def GetGenres(c,limits,properties=[]):
         properties.append("genreid")
         return c.GetList("genres",set(properties),limits)
+
     @classmethod
     def GetAlbums(c,limits,properties=[]):
         properties.append("albumid")
-        properties=["albumid","albumlabel","title","thumbnail"]
+        properties=["albumid","artistid","albumlabel","title","thumbnail","genre"]
         return c.GetList("albums",set(properties),limits)
+
     @classmethod
     def GetSongs(c,limits, properties=[]):
-        properties.append("songid")
-        properties=["songid","title","track","rating","duration","albumid"]
+        properties=["songid","title","track","rating","duration","albumid","genre"]
         return c.GetList("songs",set(properties),limits)
-    
+
 class TVLibrary(RPC):
     @classmethod
     def GetMovies(c,**p):

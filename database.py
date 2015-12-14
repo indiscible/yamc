@@ -70,10 +70,14 @@ def Song(f):
         s["track"]=int(i["tracknumber"][0].split("/")[0])
     if i.has_key("artist"):
         s["artist"]=i["artist"][0]
-
+    if i.has_key("genre"):
+        s["genre"]=[ Genre( i["genre"][0] ) ]
+        print i["genre"]
     s["songid"]= len(songs)+1
     s["artistid"]= Artist(s)
+    s["albumartistid"]= [s["artistid"]]
     s["albumid"]= Album(s)
+    
     songs.append(s)
     
 artistid={}
@@ -87,6 +91,7 @@ def Artist(s):
         "description": s["artist"],
         "thumbnail": s["thumbnail"]
         } 
+    if s.has_key("genre"): a["genre"]= s["genre"]
     newid= len(artists)+1
     a["artistid"]=newid
     artists.append(a)
@@ -110,14 +115,24 @@ def Album(s):
          "musicbrainzalbumid":s["musicbrainzalbumid"],
          "musicbrainzalbumartistid":s["musicbrainzalbumartistid"],
          "thumbnail": s["thumbnail"],
-         "artistid": s["artistid"],
-         "rating":0
+         "artistid": [s["artistid"]],
+         "rating":0,
          }
+    if s.has_key("genre"): a["genre"]= s["genre"]
     newid= len(albums)+1
     a["albumid"]=newid
     albums.append(a)
     albumid[ s["album"] ]= newid
     return newid
+
+genreid={}
+genres=[]
+def Genre(g):
+    if genreid.has_key(g): return g
+    nid= len(genres)+1
+    genres.append( { "title": g, "label":g, "genreid": nid})
+    genreid[g]= nid
+    return g
 
 for (ppath,ndir,nfile) in walk(src):
     for name in nfile:
@@ -127,3 +142,4 @@ if dumpdb:
     dump( songs, open(path.join(dst,"songs.json"),"w"))
     dump( artists, open(path.join(dst,"artists.json"),"w"))
     dump( albums, open(path.join(dst,"albums.json"),"w"))
+    dump( genres, open(path.join(dst,"genres.json"),"w"))
