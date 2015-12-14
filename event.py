@@ -78,7 +78,7 @@ def make_tcp():
     s= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind(('192.168.0.17',9090))
     s.listen(5)
-    s.settimeout(1)
+#    s.settimeout(1)
     return s
 
 
@@ -90,7 +90,7 @@ def handletcp(tcp):
 def make_udp():    
     s= socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind( ('192.168.0.17',9777))
-    s.settimeout(1)
+#   s.settimeout(1)
     return s
 
 def handleudp(udp,g=globals(),l=locals()):
