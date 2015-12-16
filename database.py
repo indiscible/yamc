@@ -4,22 +4,16 @@ from os import path,mkdir,walk
 from json import dump
 from hashlib import sha1
 
-src= "/mnt/samsung/music"
+print "database construstion"
+src= "c:\\Music"
 dst= "database"
 thumbs= "image"
 
 dumpdb= True
 
 if not path.exists(dst): mkdir(dst)
-if not path.exists(dst): mkdir(thumbs)
+if not path.exists(thumbs): mkdir(thumbs)
     
-songs=[]
-for (ppath,ndir,nfile) in walk(src):
-    for name in nfile:
-        songs.append(path.join(ppath,name))
-
-open(path.join(dst,"songs.txt"),"w").writelines(songs)
-
 def Thumbnail(img):
     if img:
         h= sha1( img.data ).hexdigest();
@@ -29,117 +23,100 @@ def Thumbnail(img):
     return ""
 
 songs=[]
-def Song(f):
-    if path.splitext(f)[1]!='.mp3':
-        return
-    print f
-    i= EasyID3(f)
-    d3= i._EasyID3__id3
-    s={
-        "title": i["title"][0],
-        "artist": "",
-        "year": 0,
-        "album": 0,
-        "track": 0,
-        "musicbrainztrackid": "" ,
-#i["musicbrainz_trackid"][0],
-        "musicbrainzartistid": "",
-#i["musicbrainz_artistid"][0],
-        "musicbrainzalbumid": "" ,
-#i["musicbrainz_albumid"][0],
-        "musicbrainzalbumartistid": "",
-#i["musicbrainz_albumartistid"][0],
-        "file": f,
-        "disc": 0,
-        "thumbnail":"",
-        "rating":0,
-        "duration":0
-        }
-    if i.has_key('length'):
-        s["duration"]= int(i["length"][0])/1000
-    print s["duration"]
-    if d3.has_key('APIC:'):
-        s["thumbnail"]= Thumbnail(d3["APIC:"])
-    if i.has_key("date"):
-        s["year"]= int(i["date"][0][:4])
-    if i.has_key("discnumber"):
-        s["disc"]= int(i["discnumber"][0].split("/")[0])
-    if i.has_key("album"):
-        s["album"]= i["album"][0]
-    if i.has_key("tracknumber"):
-        s["track"]=int(i["tracknumber"][0].split("/")[0])
-    if i.has_key("artist"):
-        s["artist"]=i["artist"][0]
-    if i.has_key("genre"):
-        s["genre"]=[ Genre( i["genre"][0] ) ]
-        print i["genre"]
-    s["songid"]= len(songs)+1
-    s["artistid"]= Artist(s)
-    s["albumartistid"]= [s["artistid"]]
-    s["albumid"]= Album(s)
-    
-    songs.append(s)
-    
-artistid={}
+class Song:
+    def __init__( s, file, thumb,
+          title="", artist="", album="", 
+          musicbrainz_trackid="", musicbrainz_albumid="",
+          musicbrainz_artistid="", musicbrainz_albumartistid="",
+          date="1976", tracknumber="1/1", performer="", 
+          length="0", discnumber="1/1", genre="",**o):
+        s.file= file
+        s.title= title
+        s.artist= artist
+        s.album= album
+        s.genre= genre
+        s.musicbrainztrackid= musicbrainz_trackid
+        s.musicbrainzalbumid= musicbrainz_albumid
+        s.musicbrainzalbumartistid= musicbrainz_albumartistid
+        s.year= date[:4]
+        s.track= int(tracknumber.split("/")[0])
+        s.albumartist= performer
+        s.duration= int(length)//1000
+        s.disc= int(discnumber.split("/")[0])
+        s.thumbnail= thumb
+        s.songid= len(songs)+1  
+
 artists=[]
-def Artist(s):
-    global artistsid
-    if artistid.has_key( s["artist"] ):
-        return artistid[ s["artist"] ]
-    a= {
-        "artist": s["artist"],
-        "description": s["artist"],
-        "thumbnail": s["thumbnail"]
-        } 
-    if s.has_key("genre"): a["genre"]= s["genre"]
-    newid= len(artists)+1
-    a["artistid"]=newid
-    artists.append(a)
-    artistid[ s["artist"] ]= newid    
-    return newid
+class Artist:
+    def __init__(s, thumb, genre="", description="", 
+                 musicbrainz_artistid="", artist="", **o):
+        s.genre=genre
+        s.description= description
+        s.musicbrainzartistid= musicbrainz_artistid
+        s.artist= artist
+        s.thumbnail= thumb
+        s.artistid= len(artists)+1
 
-albumid={}
 albums=[]
-def Album(s):
-    global albumid
-    if albumid.has_key( s["album"] ):
-        return albumid[ s["album"] ]
-    a={
-         "title": s["album"],
-         "albumlabel": s["album"],
-         "artist": s["artist"],
-         "displayartist": s["artist"],
-         "description": s["album"],
-         "rating":0,
-         "year": s["year"],
-         "musicbrainzalbumid":s["musicbrainzalbumid"],
-         "musicbrainzalbumartistid":s["musicbrainzalbumartistid"],
-         "thumbnail": s["thumbnail"],
-         "artistid": [s["artistid"]],
-         "rating":0,
-         }
-    if s.has_key("genre"): a["genre"]= s["genre"]
-    newid= len(albums)+1
-    a["albumid"]=newid
-    albums.append(a)
-    albumid[ s["album"] ]= newid
-    return newid
+class Album:
+    def __init__(s, thumbnail, 
+                 album="", albumlabel="", artist="", displayartist="",
+                 description="", date="1976", performer="", genre=[""],
+                 musicbrainz_albumid="", musicbrainz_albumartistid="", **o ):
+        s.title= album
+        s.albumlabel= album
+        s.artist= artist
+        s.albumartist= performer
+        s.displayartist= artist
+        s.year= date[:4]
+        s.genre= genre
+        s.musicbrainzalbumid= musicbrainz_albumid
+        s.musicbrainzalbumartistid= musicbrainz_albumartistid
+        s.thumbnail= thumbnail
+        s.albumid= len(albums)+1
 
-genreid={}
 genres=[]
-def Genre(g):
-    if genreid.has_key(g): return g
-    nid= len(genres)+1
-    genres.append( { "title": g, "label":g, "genreid": nid})
-    genreid[g]= nid
-    return g
+class Genre:
+    def __init__(s,g):
+        s.title= g
+        s.label= g
+        s.genreid= len(genres)+1
+
+artistid={}
+albumid={}
+genreid={}
+
+def show(o):
+    for k in dir(o):
+        if k[0]=='_': continue
+        print k,":",getattr(o,k)
+
+def update(t,k,e):
+    if not t[0].has_key(k):
+        t[1].append( e )
+        t[0][k]= len(t[1])
+    return t[0][k]
 
 for (ppath,ndir,nfile) in walk(src):
     for name in nfile:
-        Song( path.join(ppath,name) )
-         
+        print name
+        f= path.join(ppath,name)
+        i= EasyID3(f)
+        t= Thumbnail(i._EasyID3__id3.get("APIC:"))
+        j= { k:v[0] for k,v in i.items() }
+        s= Song( f, t, **j )
+        s.artistid= update( (artistid,artists), s.artist, Artist(t,**j) )
+        s.albumid= update( (albumid,albums), s.album, Album(t,**j) )
+        update( (genreid,genres), s.genre, Genre(s.genre) )
+        albums[s.albumid-1].artistid=[ s.artistid ]
+        songs.append( s )
+
+def dumptable(t,n,**kw):
+    dump( t, open(path.join(dst,n),"w"),
+               default= lambda o: o.__dict__, **kw)
 if dumpdb:
-    dump( songs, open(path.join(dst,"songs.json"),"w"))
-    dump( artists, open(path.join(dst,"artists.json"),"w"))
-    dump( albums, open(path.join(dst,"albums.json"),"w"))
-    dump( genres, open(path.join(dst,"genres.json"),"w"))
+    dumptable( songs, "songs.json", encoding='latin-1')
+    dumptable( artists, "artists.json" )
+    dumptable( albums, "albums.json" )
+    dumptable( genres, "genres.json")
+
