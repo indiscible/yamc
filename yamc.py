@@ -159,7 +159,7 @@ class Playlist(RPC):
 
         for i in pl:
             uri= path.normpath(unquote(i["uri"][7:]))
-            print uri
+            if not f2i.has_key(uri): uri=uri[1:]
             if f2i.has_key(uri):
                 c.node.append( int(i["id"]) )
                 c.items.append( AudioLibrary.songs[ f2i[uri]-1 ] )
@@ -263,13 +263,18 @@ class Player(RPC):
             print "KeyError:", e, r
 
     @classmethod
-    def PlayPause(c,playerid,play):
+    def PlayPause(c,playerid,**k):
+        if k.has_key("play"):
+            if k["play"] and c.speed==1: return "OK"
+            if not k["play"] and c.speed==0: return "OK"
+
         s=vlc.command("pl_pause")
         if s["state"]=="paused":
             c.speed= 0
         elif s["state"]=="playing":
             c.speed= 1
-        return c.speed
+        c.OnPlay()
+        return "OK"
 
     @classmethod
     def Stop(c,playerid):
@@ -309,7 +314,7 @@ class Player(RPC):
     @classmethod
     def GetItem(c,playerid,properties=[]):
         r= subdict( c.item, properties )
-        print c.item
+#        print c.item
         return { "item":r }
 
     @classmethod
