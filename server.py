@@ -9,7 +9,7 @@ from hashlib import sha1
 import logging
 import signal
 import sys
-
+logging.basicConfig(filename="server.txt",level=logging.DEBUG)
 def reply(j):
     e= yamc.execute(j)
     return { "id": j["id"], "jsonrpc":"2.0", "result": e }

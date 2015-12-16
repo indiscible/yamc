@@ -3,8 +3,10 @@ import event
 import json
 import time
 import requests
-from os import path
+from os import path,mkdir
 from urllib import unquote
+
+if not path.exists("log"): mkdir("log")
 
 class JSONRPC:
     @staticmethod

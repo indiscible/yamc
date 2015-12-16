@@ -64,3 +64,4 @@ image
 log
 record
 *.mp3
+/server.txt
