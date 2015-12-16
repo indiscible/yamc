@@ -181,8 +181,15 @@ class Playlist(RPC):
     @classmethod
     def Add(c,playlistid,item):
         if "file" in item:
-            id= item["file"].split("video_id")[1]
-            vlc.command("in_play",input="http://youtube.com/watch?v="+id)
+            f= item["file"]
+            if "youtube" in f:
+                id= item["file"].split("video_id")[1]
+                input= "http://youtube.com/watch?v="+id
+            elif "soundcloud" in f:
+                input= f.split("url=")[1]
+                print "soundclout input:", input
+            print "playing outside file:", input
+            vlc.command("in_play",input=input)
         else:
             print item
             sid= item["songid"]
@@ -237,6 +244,7 @@ class Player(RPC):
     def GetActivePlayers(c):
         print c.playerid, c.type
         return [{"playerid":c.playerid, "type":c.type}]
+
     @classmethod
     def Open(c,item):
         if item.has_key("playlistid"):
@@ -247,7 +255,7 @@ class Player(RPC):
             print "playlist:", c.item
             r= vlc.command("pl_play",id=Playlist.node[ c.position ])
         else:
-            print "play songd: ", item
+            print "play song: ", item
             c.item= AudioLibrary.songs[ item["songid"]-1 ]
             r= vlc.command("in_play", input= c.item["file"])
             Playlist.dirty= True
