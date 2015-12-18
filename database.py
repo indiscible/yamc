@@ -104,7 +104,11 @@ for (ppath,ndir,nfile) in walk(src):
         i= EasyID3(f)
         t= Thumbnail(i._EasyID3__id3.get("APIC:"))
         j= { k:v[0] for k,v in i.items() }
-        s= Song( f, t, **j )
+        try:
+            ff= f.encode("utf_8")
+        except UnicodeDecodeError:
+            ff= f.decode("latin_1").encode("utf_8")
+        s= Song( ff, t, **j )
         s.artistid= update( (artistid,artists), s.artist, Artist(t,**j) )
         s.albumid= update( (albumid,albums), s.album, Album(t,**j) )
         update( (genreid,genres), s.genre, Genre(s.genre) )
@@ -115,7 +119,7 @@ def dumptable(t,n,**kw):
     dump( t, open(path.join(dst,n),"w"),
                default= lambda o: o.__dict__, **kw)
 if dumpdb:
-    dumptable( songs, "songs.json", encoding='latin-1')
+    dumptable( songs, "songs.json")
     dumptable( artists, "artists.json" )
     dumptable( albums, "albums.json" )
     dumptable( genres, "genres.json")
