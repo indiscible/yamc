@@ -8,11 +8,6 @@ from urllib import unquote
 
 if not path.exists("log"): mkdir("log")
 
-class JSONRPC:
-    @staticmethod
-    def Ping():
-        return 'pong'
-    
 class RPC(object):
     @classmethod
     def Get(c,ps):
@@ -49,6 +44,15 @@ class RPC(object):
 
 def subdict(d,p):
     return { k:d[k] for k in p if d.has_key(k) }
+
+class JSONRPC(RPC):
+    version= { "major": 6, "minor": 25, "patch": 2}
+    @staticmethod
+    def Ping():
+        return 'pong'
+    @classmethod
+    def Version(c):
+        return c.Get(["version"])
     
 class Settings(RPC):
     audiooutputpassthrough= False
@@ -165,6 +169,10 @@ class Playlist(RPC):
                 c.items.append( AudioLibrary.songs[ f2i[uri]-1 ] )
         c.dirty= False
         print c.node
+
+    @classmethod
+    def GetPlaylists(c):
+        return { "items":{ "playlistid":0, "type":"audio" } }
 
     @classmethod
     def GetItems(c,playlistid, limits, properties=[]):
@@ -287,6 +295,7 @@ class Player(RPC):
     @classmethod
     def Stop(c,playerid):
         vlc.command("pl_stop")
+        return "OK"
 
     @classmethod
     def SetSpeed(c,playerid,speed):
