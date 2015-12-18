@@ -417,17 +417,13 @@ def execute(j):
     c,m= j["method"].split(".")
     C= globals()[c]
     print c,m
-    try:
-        if j.has_key("params"):
-#            print c,m,j["params"]
-            r=getattr(C,m)(**j["params"])
+    if j.has_key("params"):
+        #            print c,m,j["params"]
+        r=getattr(C,m)(**j["params"])
 #            print c,m,j["params"],":",r
-            return r
-        else:
-            r= getattr(C,m)()
+        return r
+    else:
+        r= getattr(C,m)()
 #            print c,m,":",r
-            return r
-    except AttributeError as e:
-        print e, j
-    except TypeError as e:
-        print e, j
+        return r
+

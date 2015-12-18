@@ -27,11 +27,11 @@ def post( d ):
                 r.append(reply(jj))
         else:
             r= reply(j)            
-    except ValueError as e:
-        print e
+    except (AttributeError,TypeError,ValueError) as e:
+        print "Error:",e, d
         return Response( "", mimetype='application/json')
     r= json.dumps(r)
-#    print r
+    print r
     return Response(  r, mimetype='application/json')
 
 def get(d):
@@ -66,6 +66,7 @@ if not locals().has_key("server"):
     print "server started"
 
 def close():
+    global ss
     for s in ss:
         s.close()
     ss= None
