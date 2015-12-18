@@ -1,11 +1,13 @@
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
+from mutagen.id3._util import ID3NoHeaderError
 from os import path,mkdir,walk
 from json import dump
 from hashlib import sha1
+import sys
 
-print "database construstion"
-src= "c:\\Music"
+src= sys.argv[1] if len(sys.argv)>1 else "C:\\Music"
+print sys.argv,src
 dst= "database"
 thumbs= "image"
 
@@ -101,7 +103,11 @@ for (ppath,ndir,nfile) in walk(src):
     for name in nfile:
         print name
         f= path.join(ppath,name)
-        i= EasyID3(f)
+        try:
+            i= EasyID3(f)
+        except ID3NoHeaderError:
+            print f," not an mp3 file"
+            continue
         t= Thumbnail(i._EasyID3__id3.get("APIC:"))
         j= { k:v[0] for k,v in i.items() }
         try:
