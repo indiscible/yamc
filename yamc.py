@@ -81,8 +81,8 @@ class Application(RPC):
         return "OK"
 
     @classmethod
-    def SetVolume(c,val):
-        c.volume=val
+    def SetVolume(c,volume):
+        c.volume=256*(volume/100.0)
         vlc.command("volume",val=c.volume)
         c.VolumeChanged()
         
