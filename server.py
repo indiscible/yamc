@@ -11,12 +11,14 @@ import signal
 import sys
 logging.basicConfig(filename="server.txt",level=logging.DEBUG)
 def reply(j):
-    e= yamc.execute(j)
+    try:
+        e= yamc.execute(j)
+    except: 
+        print "error executing ", j
+        print sys.exc_info(),j
+        return { "id": j["id"], "jsonrpc":"2.0", "error":
+                 { "code": 0, "message": "eerror" } }
     return { "id": j["id"], "jsonrpc":"2.0", "result": e }
-
-def error(code,message):
-    return { "id": j["id"], "jsonrpc":"2.0", "error":
-             { "code": code, "message": message } }
 
 def post( d ):
     try:
