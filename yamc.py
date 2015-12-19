@@ -114,6 +114,9 @@ def seconds2time(ss):
     ms= int( ss*1000)
     return { "hours": h, "minutes": m, "seconds": s, "milliseconds": ms }
 
+def time2seconds(ss):
+    return ss["hours"]*3600 + ss["minutes"]*60 + ss["seconds"]
+
 class vlc:
     log= open("log/vlc.txt","w")
     root= "http://:vlc@127.0.0.1:10000/requests/"
