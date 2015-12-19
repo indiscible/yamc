@@ -28,7 +28,7 @@ class K:
         s.method=""
         r= requests.post(s.dest,json=json)
         try:
-            return r.json()
+            return r.json()["result"]
         except ValueError:
             return r.text
             
@@ -36,5 +36,5 @@ class K:
 
 k= K("http://192.168.0.13:8001")
 
-r=k.Player.GetStatus()
+print k.Player.GetActivePlayers()
 

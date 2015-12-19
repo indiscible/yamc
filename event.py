@@ -57,22 +57,29 @@ if not locals().has_key("clients"):
     global clients
     clients={}
 
-def post(m,d):
-    msg= json.dumps( { "jsonrpc":"2.0",
-                         "method": m,
-                         "params": { "data": d, "sender":"xbmc" } } )
-    print msg
-    bads=[]
-    for c in clients:
-        try:
-            c.send( msg )
-        except socket.error as e:
-            print "send error:", clients[c], e
-            if not e.errno == socket.errno.EPIPE:
-                bads.append(c)
-    for b in bads:
-        print "remove client:", b
-        clients.pop(b)
+class post():
+    def __init__(s):
+        s.name=[]
+    def __getattr__(s,n):
+        s.name.append( n )
+        return s
+    def __call__(s,*p,**q):
+        print "post:", s.name, p, q
+        msg= json.dumps( { "jsonrpc":"2.0",
+                           "method": ".".join(s.name),
+                           "params": { "data": q, "sender":"yamc" } } )
+        print msg
+        bads=[]
+        for c in clients:
+            try:
+                c.send( msg )
+            except socket.error as e:
+                print "send error:", clients[c], e
+                if not e.errno == socket.errno.EPIPE:
+                    bads.append(c)
+        for b in bads:
+            print "remove client:", b
+            clients.pop(b)
 
 def make_tcp():
     s= socket.socket(socket.AF_INET, socket.SOCK_STREAM)

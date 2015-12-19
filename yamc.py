@@ -68,8 +68,7 @@ class Application(RPC):
     muted= False
     @classmethod
     def VolumeChanged(c):
-        event.post( "OnVolumeChanged", 
-                    { "muted": c.muted, "volume": c.volume } )
+        event.post().OnVolumeChanged(muted=c.muted, volume=c.volume)
 
     @classmethod
     def SetMute(c,mute):
@@ -79,6 +78,7 @@ class Application(RPC):
         else:
             vlc.command("volume",val=c.volume)
         c.VolumeChanged()
+        return "OK"
 
     @classmethod
     def SetVolume(c,val):
@@ -123,12 +123,7 @@ class vlc:
         for t in kwargs.items():
             args.append(t[0]+"="+str(t[1]))
         req= c.root + "status.json?command=" + "&".join(args)
-        c.log.write(req)
-        c.log.write("\n")
         r= requests.get(req).json()
-        c.log.write(str(r))
-        c.log.write("\n")
-        c.log.flush()
         return r
     @classmethod
     def playlist(c):
@@ -203,10 +198,10 @@ class Playlist(RPC):
             sid= item["songid"]
             vlc.command("in_enqueue",
                         input= AudioLibrary.songs[sid-1]["file"])
-            event.post( "Playlist.OnAdd",
-                        { "items": { "id": sid, "type":"song" },
-                          "playlistid": playlistid,
-                          "position": c.count } )
+            event.post().Playlist.OnAdd(
+                items= { "id": sid, "type":"song" },
+                playlistid= playlistid,
+                position= c.count  )
             c.count=c.count+1
             c.dirty= True
         return "OK"
@@ -232,9 +227,9 @@ class Player(RPC):
     item={}
     @classmethod
     def OnPlay(c):
-        event.post( "Player.OnPlay", 
-                    { "items": { "id": c.item["songid"], "type":"song" },
-                      "player": { "playerid": c.playerid, "speed":c.speed } } )
+        event.post().Player.OnPlay( 
+            items= { "id": c.item["songid"], "type":"song" },
+            player= { "playerid": c.playerid, "speed":c.speed } )
 
     @classmethod
     def Plus(c):
