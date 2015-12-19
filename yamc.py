@@ -82,8 +82,8 @@ class Application(RPC):
 
     @classmethod
     def SetVolume(c,volume):
-        c.volume=256*(volume/100.0)
-        vlc.command("volume",val=c.volume)
+        c.volume=volume
+        vlc.command("volume",val=256*(c.volume/100.0))
         c.VolumeChanged()
         
 def Mute(): Application.SetMute("toggle")
