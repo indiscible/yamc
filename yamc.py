@@ -317,8 +317,12 @@ class Player(RPC):
 
     @classmethod
     def Seek(c,playerid,value):
-        print value, c.duration
-        vlc.command("seek",val=int(value*c.duration//100))
+        if type(value)==dict:
+            pos= time2seconds(value)
+        elif type(value)==float:
+            pos= value*c.duration//100
+        print value,pos
+        vlc.command("seek",val=pos)
         r= c.Get(["totaltime","percentage","time"] )
         print r
         return r
