@@ -4,7 +4,7 @@ import json
 import time
 import requests
 from os import path,mkdir
-from urllib import unquote
+from urllib import unquote,quote
 
 if not path.exists("log"): mkdir("log")
 
@@ -189,11 +189,17 @@ class Playlist(RPC):
         if "file" in item:
             f= item["file"]
             if "youtube" in f:
-                id= item["file"].split("video_id")[1]
-                input= "http://youtube.com/watch?v="+id
+                if "video_id=" in f: sep= "video_id="
+                if "videoid=" in f: sep= "videoid="
+                id= item["file"].split(sep)[1]
+                input= quote("http://youtube.com/watch?v="+id)
             elif "soundcloud" in f:
-                input= f.split("url=")[1]
-                print "soundclout input:", input
+                print f
+                if "audio_id=" in f: 
+                    id= f.split("audio_id=")[1]
+                    url= requests.get('https://api.soundcloud.com/tracks/'+ id + '/stream?client_id=d286f9f11bac3d365b66cf9092705075',allow_redirects=False)
+                    input= quote(url.json()["location"])
+                    print "soundcloud input:", input
             print "playing outside file:", input
             vlc.command("in_play",input=input)
         else:
