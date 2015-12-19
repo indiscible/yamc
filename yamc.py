@@ -142,8 +142,37 @@ class vlc:
         node= p["children"][0]["children"][i]["id"]
         return c.command("pl_play",id=node)
 
+def youtube(f):
+    print "trying youtube loader",unquote(f)
+    if not youtube in unquote(f): return None
+    print "ok thi si syoutube"
+    if "video_id=" in f: sep= "video_id="
+    if "videoid=" in f: sep= "videoid="
+    id= f.split(sep)[1]
+    return "http://youtube.com/watch?v="+id
+           
+def soundcloud(f):
+    print 'loading soundcloud file',f
+    if not "soundcloud" in f: return None
 
-        
+    key='client_id=d286f9f11bac3d365b66cf9092705075'
+    if "audio_id=" in f: 
+        id= f.split("audio_id=")[1]
+        stream= requests.get('https://api.soundcloud.com/tracks/'+ id + '/stream?'+key,allow_redirects=False)
+    elif  "url=" in f:
+        url=f.split("url=")[1]
+        r=requests.get("https://api.soundcloud.com/resolve.json?url="+url+"&"+key)
+        stream= requests.get(r.json()["stream_url"]+'?'+key,allow_redirects=False)         
+    print stream
+    return stream.json()["location"]
+
+def externfile(f):
+    
+#    r1= youtube(f) 
+    r2= soundcloud(f)
+    print r2
+    return r2 
+
 class Playlist(RPC):
     items=[]
     node=[]
@@ -187,32 +216,19 @@ class Playlist(RPC):
     @classmethod
     def Add(c,playlistid,item):
         if "file" in item:
-            f= item["file"]
-            if "youtube" in f:
-                if "video_id=" in f: sep= "video_id="
-                if "videoid=" in f: sep= "videoid="
-                id= item["file"].split(sep)[1]
-                input= quote("http://youtube.com/watch?v="+id)
-            elif "soundcloud" in f:
-                print f
-                if "audio_id=" in f: 
-                    id= f.split("audio_id=")[1]
-                    url= requests.get('https://api.soundcloud.com/tracks/'+ id + '/stream?client_id=d286f9f11bac3d365b66cf9092705075',allow_redirects=False)
-                    input= quote(url.json()["location"])
-                    print "soundcloud input:", input
-            print "playing outside file:", input
-            vlc.command("in_play",input=input)
+            input= quote(externfile( item["file"] ))
+            sid=-1
         else:
-            print item
             sid= item["songid"]
-            vlc.command("in_enqueue",
-                        input= AudioLibrary.songs[sid-1]["file"])
-            event.post().Playlist.OnAdd(
-                items= { "id": sid, "type":"song" },
-                playlistid= playlistid,
-                position= c.count  )
-            c.count=c.count+1
-            c.dirty= True
+            input= quote(AudioLibrary.songs[sid-1]["file"])
+        print input
+        vlc.command("in_enqueue", input= input)
+        event.post().Playlist.OnAdd(
+            items= { "id": sid, "type":"song" },
+            playlistid= playlistid,
+            position= c.count  )
+        c.count=c.count+1
+        c.dirty= True
         return "OK"
 
 class Player(RPC):
@@ -266,6 +282,10 @@ class Player(RPC):
             c.item= Playlist.items[ c.position ]
             print "playlist:", c.item
             r= vlc.command("pl_play",id=Playlist.node[ c.position ])
+        elif item.has_key("file"):
+            print "playing file", item["file"]
+            r= vlc.command("in_play",input=quote(externfile(item["file"])))
+            c.item["songid"]=0
         else:
             print "play song: ", item
             c.item= AudioLibrary.songs[ item["songid"]-1 ]
@@ -357,6 +377,7 @@ class Player(RPC):
         c.time= seconds2time(s["position"]*s["length"])
         c.totaltime= seconds2time(s["length"])
         c.shuffled= s["random"]
+        c.volume= s["volume"]/255.0
         n=Playlist.node
         print c.position
         if s.has_key("currentplid"):
