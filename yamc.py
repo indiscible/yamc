@@ -1,5 +1,7 @@
 import subprocess
 import event
+import plugin
+import external
 import json
 import time
 import requests
@@ -117,62 +119,6 @@ def seconds2time(ss):
 def time2seconds(ss):
     return ss["hours"]*3600 + ss["minutes"]*60 + ss["seconds"]
 
-class vlc:
-    log= open("log/vlc.txt","w")
-    root= "http://:vlc@127.0.0.1:10000/requests/"
-    @classmethod
-    def command(c, cc,**kwargs):
-        args=[cc]
-        for t in kwargs.items():
-            args.append(t[0]+"="+str(t[1]))
-        req= c.root + "status.json?command=" + "&".join(args)
-        r= requests.get(req).json()
-        return r
-    @classmethod
-    def playlist(c):
-        return requests.get( c.root + "playlist.json" ).json()
-
-    @classmethod
-    def status(c):
-        return requests.get( c.root + "status.json" ).json()
-
-    @classmethod
-    def play(c,i):
-        p= c.playlist()
-        node= p["children"][0]["children"][i]["id"]
-        return c.command("pl_play",id=node)
-
-def youtube(f):
-    print "trying youtube loader",unquote(f)
-    if not youtube in unquote(f): return None
-    print "ok thi si syoutube"
-    if "video_id=" in f: sep= "video_id="
-    if "videoid=" in f: sep= "videoid="
-    id= f.split(sep)[1]
-    return "http://youtube.com/watch?v="+id
-           
-def soundcloud(f):
-    print 'loading soundcloud file',f
-    if not "soundcloud" in f: return None
-
-    key='client_id=d286f9f11bac3d365b66cf9092705075'
-    if "audio_id=" in f: 
-        id= f.split("audio_id=")[1]
-        stream= requests.get('https://api.soundcloud.com/tracks/'+ id + '/stream?'+key,allow_redirects=False)
-    elif  "url=" in f:
-        url=f.split("url=")[1]
-        r=requests.get("https://api.soundcloud.com/resolve.json?url="+url+"&"+key)
-        stream= requests.get(r.json()["stream_url"]+'?'+key,allow_redirects=False)         
-    print stream
-    return stream.json()["location"]
-
-def externfile(f):
-    
-#    r1= youtube(f) 
-    r2= soundcloud(f)
-    print r2
-    return r2 
-
 class Playlist(RPC):
     items=[]
     node=[]
@@ -191,9 +137,11 @@ class Playlist(RPC):
         for i in pl:
             uri= path.normpath(unquote(i["uri"][7:]))
             if not f2i.has_key(uri): uri=uri[1:]
+            c.node.append( int(i["id"]) )
             if f2i.has_key(uri):
-                c.node.append( int(i["id"]) )
                 c.items.append( AudioLibrary.songs[ f2i[uri]-1 ] )
+            else:
+                c.items.append( { "position": len(c.node), "name": i["name"]})
         c.dirty= False
         print c.node
 
@@ -215,8 +163,9 @@ class Playlist(RPC):
 
     @classmethod
     def Add(c,playlistid,item):
+        print item
         if "file" in item:
-            input= quote(externfile( item["file"] ))
+            input= quote(soundcloud.url( item["file"] ))
             sid=-1
         else:
             sid= item["songid"]
@@ -224,13 +173,21 @@ class Playlist(RPC):
         print input
         vlc.command("in_enqueue", input= input)
         event.post().Playlist.OnAdd(
-            items= { "id": sid, "type":"song" },
+            item= { "id": sid, "type":"song" },
             playlistid= playlistid,
             position= c.count  )
         c.count=c.count+1
         c.dirty= True
         return "OK"
 
+    @classmethod
+    def Open(c,playlistid=None,position=None,**o):
+        if playlistid==None: return None
+        if position==None: return None
+        c.refresh()
+        vlc.command("pl_play",id=c.node[ position ])
+        return c.items[ position ]
+        
 class Player(RPC):
     playerid=0
     type="audio"
@@ -251,9 +208,12 @@ class Player(RPC):
     duration=0
     item={}
     @classmethod
-    def OnPlay(c):
+    def OnPlay(c,songid=None,file=None,**o):
+        items= { "type":"song" }
+        if songid!=None: items["id"]=songid
+        if file!=None: items["file"]=file
         event.post().Player.OnPlay( 
-            items= { "id": c.item["songid"], "type":"song" },
+            items= items,
             player= { "playerid": c.playerid, "speed":c.speed } )
 
     @classmethod
@@ -275,33 +235,17 @@ class Player(RPC):
 
     @classmethod
     def Open(c,item):
-        if item.has_key("playlistid"):
-            Playlist.refresh()
-            print item
-            c.position= item["position"]
-            c.item= Playlist.items[ c.position ]
-            print "playlist:", c.item
-            r= vlc.command("pl_play",id=Playlist.node[ c.position ])
-        elif item.has_key("file"):
-            print "playing file", item["file"]
-            r= vlc.command("in_play",input=quote(externfile(item["file"])))
-            c.item["songid"]=0
-        else:
-            print "play song: ", item
-            c.item= AudioLibrary.songs[ item["songid"]-1 ]
-            r= vlc.command("in_play", input= c.item["file"])
-            Playlist.dirty= True
+        print item
+        c.item= Playlist.Open( **item ) or \
+                AudioLibrary.Open(**item) or \
+                plugin.Open(**item)
+        if not c.item: raise Exception, 'Cannot open'+ str(item)
+
         c.type= "audio"
         c.playerid=0
-        c.OnPlay()
-        try:
-            stream= r["information"]["category"]["Stream 0"]
-            XBMC.MusicPlayerCodec= stream["Codec"]
-            XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
-            XBMC.MusicPlayerBitRate= stream["Bitrate"]
-        except KeyError as e:
-            print "KeyError:", e, r
 
+        c.OnPlay(**c.item)
+        
     @classmethod
     def PlayPause(c,playerid,**k):
         if k.has_key("play"):
@@ -365,6 +309,13 @@ class Player(RPC):
     @classmethod
     def GetProperties(c,playerid,properties):
         s= vlc.status();
+        try:
+            stream= s["information"]["category"]["Stream 0"]
+            XBMC.MusicPlayerCodec= stream["Codec"]
+            XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
+            XBMC.MusicPlayerBitRate= stream["Bitrate"]
+        except KeyError as e:
+            print "KeyError:", e, r
         Playlist.refresh()
         if s["loop"]:
             c.repeat="on"
@@ -434,6 +385,16 @@ class AudioLibrary(RPC):
     def GetSongs(c,limits, properties=[]):
         properties=["songid","title","track","rating","duration","albumid","genre"]
         return c.GetList("songs",set(properties),limits)
+
+    @classmethod
+    def Open(c,songid=None,**o):
+        if songid==None: return None
+        if songid<1: raise Exception,'Songid must be >0'+str(songid)
+        print "MusicLibray open song extra:", o
+        item= AudioLibrary.songs[ songid-1 ]
+        vlc.command("in_play", input= item["file"])
+        Playlist.dirty= True
+        return item
 
 class TVLibrary(RPC):
     @classmethod
