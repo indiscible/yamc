@@ -5,6 +5,9 @@ import subprocess
 import json
 import event
 import yamc
+import plugin
+import playlist
+import vlc
 from hashlib import sha1
 import logging
 import signal
@@ -85,7 +88,7 @@ def filehash(file):
         return sha1(inp.read()).hexdigest()
 
 def go():
-    libs= { yamc:"", event:"" }
+    libs= { yamc:"", event:"", playlist:"", vlc:"", plugin:"" }
     while(1):
         print "Waiting for request"
         rl = select( ss, [], [])

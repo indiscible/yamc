@@ -5,45 +5,15 @@ import external
 import json
 import time
 import requests
+from playlist import Playlist
+import vlc
+
+from rpc import RPC
 from os import path,mkdir
 from urllib import unquote,quote
 
 if not path.exists("log"): mkdir("log")
-
-class RPC(object):
-    @classmethod
-    def Get(c,ps):
-        r={}
-        for p in ps:
-            name= "".join( p.split(".") )
-            if hasattr(c, name ):
-                r[p]= getattr(c,name)
-        return r
-            
-    @classmethod
-    def GetProperties(c,properties,**o):
-        return c.Get(properties)
-
-    @classmethod
-    def GetInfoBooleans(c,booleans):
-        return c.Get(booleans)
-        
-    @classmethod
-    def GetInfoLabels(c,labels):
-        return c.Get(labels)
-
-    @classmethod
-    def GetList(c,k,p,l):
-        v= getattr(c,k)
-        r= v[ l["start"]:l["end"] ]
-        if p:
-            r=[]
-            for e in v[ l["start"]:l["end"] ]:
-                r.append( { k:e[k] for k in p if e.has_key(k)} )
-        return { k: r,
-                 "limits":
-                 { "start": 0, "end":len(r), "total":len(v) } }
-
+    
 def subdict(d,p):
     return { k:d[k] for k in p if d.has_key(k) }
 
@@ -78,7 +48,7 @@ class Application(RPC):
         if c.muted:
             vlc.command("volume",val=0)
         else:
-            vlc.command("volume",val=c.volume)
+            vlc.command("volume",val=256*(c.volume/100.0))
         c.VolumeChanged()
         return "OK"
 
@@ -91,14 +61,16 @@ class Application(RPC):
 def Mute(): Application.SetMute("toggle")
 def skipminus(): Player.Minus()
 def skipplus(): Player.Plus()
-def forward(): vlc.command("seek",val="+5")
-def reverse(): vlc.command("seek",val="-5")
+def forward(): vlc.command("seek",val="+5%")
+def reverse(): vlc.command("seek",val="-5%")
 def volumeminus(): Application.SetVolume( Application.volume-16 )
 def volumeplus(): Application.SetVolume( Application.volume+16 )
-MusicLibrary= "Hello"
-Videos="Videos"
-TvShowTitles="TvShowTitles"
-def ActivateWindow(w): print "ActivateWindows:", w
+def display(): vlc.command("fullscreen")
+
+#MusicLibrary= "Hello"
+#Videos="Videos"
+#TvShowTitles="TvShowTitles"
+#def ActivateWindow(w): print "ActivateWindows:", w
 
 class XBMC(RPC):
     SystemPlatformLinux= True
@@ -118,75 +90,6 @@ def seconds2time(ss):
 
 def time2seconds(ss):
     return ss["hours"]*3600 + ss["minutes"]*60 + ss["seconds"]
-
-class Playlist(RPC):
-    items=[]
-    node=[]
-    dirty=True
-    count=0
-    @classmethod
-    def refresh(c):
-        if not c.dirty: return
-        c.items=[]
-        c.node=[]
-        f2i={}
-        pl= vlc.playlist()["children"][0]["children"]
-
-        for s in AudioLibrary.songs: f2i[s["file"]]= s["songid"]
-
-        for i in pl:
-            uri= path.normpath(unquote(i["uri"][7:]))
-            if not f2i.has_key(uri): uri=uri[1:]
-            c.node.append( int(i["id"]) )
-            if f2i.has_key(uri):
-                c.items.append( AudioLibrary.songs[ f2i[uri]-1 ] )
-            else:
-                c.items.append( { "position": len(c.node), "name": i["name"]})
-        c.dirty= False
-        print c.node
-
-    @classmethod
-    def GetPlaylists(c):
-        return { "items":{ "playlistid":0, "type":"audio" } }
-
-    @classmethod
-    def GetItems(c,playlistid, limits, properties=[]):
-        c.refresh()
-        return c.GetList("items",properties,limits)
-        
-    @classmethod
-    def Clear(c,playlistid):
-        vlc.command("pl_empty")
-        c.dirty= True
-        c.count=0
-        return "OK"
-
-    @classmethod
-    def Add(c,playlistid,item):
-        print item
-        if "file" in item:
-            input= quote(soundcloud.url( item["file"] ))
-            sid=-1
-        else:
-            sid= item["songid"]
-            input= quote(AudioLibrary.songs[sid-1]["file"])
-        print input
-        vlc.command("in_enqueue", input= input)
-        event.post().Playlist.OnAdd(
-            item= { "id": sid, "type":"song" },
-            playlistid= playlistid,
-            position= c.count  )
-        c.count=c.count+1
-        c.dirty= True
-        return "OK"
-
-    @classmethod
-    def Open(c,playlistid=None,position=None,**o):
-        if playlistid==None: return None
-        if position==None: return None
-        c.refresh()
-        vlc.command("pl_play",id=c.node[ position ])
-        return c.items[ position ]
         
 class Player(RPC):
     playerid=0
@@ -219,14 +122,14 @@ class Player(RPC):
     @classmethod
     def Plus(c):
         vlc.command("pl_next")
-        c.position= (c.position+1)%len(Playlist.items)
-        c.OnPlay()
-
+        c.position= Playlist.position( vlc.status() )
+        c.OnPlay( **Playlist.items[c.position] )
+  
     @classmethod
     def Minus(c):
         vlc.command("pl_previous")
-        c.position= (c.position-1)%len(Playlist.items)
-        c.OnPlay()
+        c.position= Playlist.position( vlc.status)  
+        c.OnPlay( **Playlist.items[c.position] )
         
     @classmethod
     def GetActivePlayers(c):
@@ -236,14 +139,10 @@ class Player(RPC):
     @classmethod
     def Open(c,item):
         print item
-        c.item= Playlist.Open( **item ) or \
-                AudioLibrary.Open(**item) or \
-                plugin.Open(**item)
+        c.item= Playlist.Open( **item )
         if not c.item: raise Exception, 'Cannot open'+ str(item)
-
         c.type= "audio"
         c.playerid=0
-
         c.OnPlay(**c.item)
         
     @classmethod
@@ -272,8 +171,10 @@ class Player(RPC):
 
     @classmethod
     def GoTo(c,playerid, to ):
-        c.Open({ "playlistid":0, "position":to })
-
+        vlc.command("pl_play",id=Playlist.getnodes()[to] )
+        c.position= to
+        return "OK"
+        
     @classmethod
     def SetRepeat(c,playerid,repeat):
         print "repeat:", repeat
@@ -315,28 +216,22 @@ class Player(RPC):
             XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
             XBMC.MusicPlayerBitRate= stream["Bitrate"]
         except KeyError as e:
-            print "KeyError:", e, r
-        Playlist.refresh()
+            print "KeyError:", e
+
         if s["loop"]:
-            c.repeat="on"
+            c.repeat="on" 
         elif s["repeat"]:
             c.repeat="all"
         else:
             c.repeat="off"
+        c.shuffled= s["random"]
         c.duration= s["length"]
         c.percentage=s["position"] 
         c.time= seconds2time(s["position"]*s["length"])
         c.totaltime= seconds2time(s["length"])
-        c.shuffled= s["random"]
         c.volume= s["volume"]/255.0
-        n=Playlist.node
-        print c.position
-        if s.has_key("currentplid"):
-            id= s["currentplid"]
-            if id in n:
-                c.position= n.index(id)
-        if c.position<len(Playlist.items):        
-            c.item= Playlist.items[c.position]
+        c.position= Playlist.position(**s)
+        c.item= Playlist.items[c.position]
         if s["state"]=="stopped":
             c.speed=0
         elif s["state"]=="playing":
@@ -363,6 +258,11 @@ class AudioLibrary(RPC):
     artists= json.load( open("database/artists.json", "r") )
     genres= json.load( open("database/genres.json", "r") )
 
+    @classmethod 
+    def Get(c,songid=None,**o):
+        if not songid: return None
+        return c.songs[ songid-1 ]
+
     @classmethod
     def GetArtists(c,limits,properties=[]):
         properties.append("artistid")
@@ -385,16 +285,6 @@ class AudioLibrary(RPC):
     def GetSongs(c,limits, properties=[]):
         properties=["songid","title","track","rating","duration","albumid","genre"]
         return c.GetList("songs",set(properties),limits)
-
-    @classmethod
-    def Open(c,songid=None,**o):
-        if songid==None: return None
-        if songid<1: raise Exception,'Songid must be >0'+str(songid)
-        print "MusicLibray open song extra:", o
-        item= AudioLibrary.songs[ songid-1 ]
-        vlc.command("in_play", input= item["file"])
-        Playlist.dirty= True
-        return item
 
 class TVLibrary(RPC):
     @classmethod
@@ -425,4 +315,5 @@ def execute(j):
         r= getattr(C,m)()
 #            print c,m,":",r
         return r
+
 

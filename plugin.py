@@ -1,16 +1,18 @@
-from vlc import vlc
+import vlc
 from urllib import unquote,quote
 import requests
 
 def youtube(f):
     if not "youtube" in f: return None
-    id= f.split("videoid=")[1]
+    if "videoid=" in f: id= f.split("videoid=")[1]
+    if "video_id=" in f: id= f.split("video_id=")[1]
+    elif "watch?v=" in f: id= f.split("watch?v=")[1]
     input= 'http://youtube.com/watch?v='+id
     return { "name": id, "file":input }
     
 def Open(file=None):
     if not file: return None
-    item= youtube(file) or soundcloud.open(file)
+    item= resolve(file)
     print len(item)
     if type(item["file"])==list:
         print item["file"]
@@ -22,6 +24,10 @@ def Open(file=None):
     else:
         vlc.command("in_play",input=quote(item["file"]))
     return item
+
+def get(file=None,**o):
+    if not file: return None
+    return youtube(file) or soundcloud.open(file)
 
 class soundcloud:
     root="https://api.soundcloud.com/"
