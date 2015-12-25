@@ -65,7 +65,6 @@ def forward(): vlc.command("seek",val="+5%")
 def reverse(): vlc.command("seek",val="-5%")
 def volumeminus(): Application.SetVolume( Application.volume-16 )
 def volumeplus(): Application.SetVolume( Application.volume+16 )
-def display(): vlc.command("fullscreen")
 
 #MusicLibrary= "Hello"
 #Videos="Videos"
@@ -111,25 +110,28 @@ class Player(RPC):
     duration=0
     item={}
     @classmethod
-    def OnPlay(c,songid=None,file=None,**o):
-        items= { "type":"song" }
-        if songid!=None: items["id"]=songid
-        if file!=None: items["file"]=file
+    def OnPlay(c,songid=None,**item):
+        item[ "type" ]="song"
+        if songid!=None: item["id"]=songid
         event.post().Player.OnPlay( 
-            items= items,
+            items= item,
             player= { "playerid": c.playerid, "speed":c.speed } )
 
+        
     @classmethod
     def Plus(c):
         vlc.command("pl_next")
-        c.position= Playlist.position( vlc.status() )
+        c.position= Playlist.position( **vlc.status() )
+        print "plus:", c.position
         c.OnPlay( **Playlist.items[c.position] )
+        Playlist.dirty= True
   
     @classmethod
     def Minus(c):
         vlc.command("pl_previous")
-        c.position= Playlist.position( vlc.status)  
+        c.position= Playlist.position( **vlc.status)
         c.OnPlay( **Playlist.items[c.position] )
+        Playlist.dirty= True
         
     @classmethod
     def GetActivePlayers(c):

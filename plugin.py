@@ -40,12 +40,16 @@ class soundcloud:
         id= unquote(f).split("soundcloud.com")[1]
         if "sets" in input:
             return { "name": id, "file": c.set(input) }
-        return { "name":id, "file":input }
+        return { "name":id, "file": input }
 
     @classmethod
     def set(c,url):
         j= c.resolve(url).json()
-        return [ t["permalink_url"] for t in j["tracks"] ]
+        return [ {
+            "file":t["permalink_url"],
+            "title":t["title"]
+        } for t in j["tracks"] ]
+
 
     @classmethod
     def resolve(c,url):
