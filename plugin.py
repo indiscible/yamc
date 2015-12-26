@@ -1,6 +1,8 @@
 import vlc
 from urllib import unquote,quote
 import requests
+import os
+import json
 
 def youtube(f):
     if not "youtube" in f: return None
@@ -36,7 +38,7 @@ class soundcloud:
     @classmethod
     def open(c,f):
         if not "soundcloud" in f: return None
-        input= unquote(f).split("url=")[1]
+        input= unquote(f).split("https://")[1]
         id= unquote(f).split("soundcloud.com")[1]
         if "sets" in input:
             return { "name": id, "file": c.set(input) }
@@ -44,13 +46,18 @@ class soundcloud:
 
     @classmethod
     def set(c,url):
-        j= c.resolve(url).json()
+        j= c.resolve(url)
         return [ {
             "file":t["permalink_url"],
-            "title":t["title"]
-        } for t in j["tracks"] ]
-
+            "title":t["title"] } for t in j["tracks"] ]
 
     @classmethod
     def resolve(c,url):
-        return requests.get(c.root+"resolve.json?url="+url+"&"+c.key)
+        try:
+            return json.load(open(url))
+        except (IOError,ValueError):
+            r= requests.get(c.root+"resolve.json?url=https://"+url+"&"+c.key).json()
+            dir=  os.path.split(url)[0] 
+            if not os.path.exists(dir): os.makedirs(dir)
+            json.dump( r, open(url,"wb"), indent=2 )
+            return r
