@@ -74,20 +74,25 @@ class soundcloud:
         u= urlparse(f)
         if not "soundcloud" in u.netloc: return None
         url= unquote(u.query).split("https://")[1]
-        return c.sets(url) or [c.song(url)]
+        return c.sets(url) or [c.song(url=url)]
 
     @classmethod
-    def song(c,url,title=None):
-        title=title or os.path.split(url)[1]
-        return { "name":  title,
-                 "file": "https://"+url }
+    def song(c,url=None,title=None,permalink_url=None,
+             duration=0, genre=None, artwork_url=None,
+             tag_list=None, user={"username":""}, **o):
+        return { "title":  title or os.path.split(url)[1],
+                 "artist": user["username"],
+                 "file": "https://"+ (url or permalink_url[7:]),
+                 "duration": int(duration//1000),
+                 "genre": [ genre ],
+                 "thumbnail": Thumbnail( artwork_url ),
+                 "tags": tag_list }
        
     @classmethod
     def sets(c,url):
         if not "sets" in url: return None
         j= c.resolve(url)
-        return [ c.song(t["permalink_url"][7:],title=t["title"])
-                 for t in j["tracks"] ]
+        return [ c.song(**t) for t in j["tracks"] ]
 
     @classmethod
     def resolve(c,url):
