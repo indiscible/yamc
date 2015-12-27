@@ -10,10 +10,8 @@ def Thumbnail(url):
     u= urlparse(url)
     q= os.path.normpath(u.path[1:])
     p= os.path.join("image",q)
-    print p
     if not os.path.exists(p):
         d= os.path.split(p)[0]
-        print d
         if not os.path.exists(d): os.makedirs(d)
         open(p,'wb').write( requests.get(url).content )
     return q
@@ -25,7 +23,6 @@ class youtube:
         u= urlparse(f)
         if not "youtube" in u.netloc: return None
         q= { k:v[0] for k,v in parse_qs(u.query).items() }
-        print q
         return c.list(**q) or [c.video(**q)]
         
     @classmethod
@@ -34,7 +31,6 @@ class youtube:
               author=None, length_seconds=0, thumbnail=None,
               **o):
         id= video_id or videoid or v or encrypted_id
-        name= title or id
         if not id: return None
         return { "title": title or id,
                  "file": c.root + "watch?v=" + id,
@@ -52,14 +48,11 @@ class youtube:
             req='list_ajax?action_get_list=1&style=json&list='
             print c.root+req+str(playlist_id)
             j= requests.get(c.root+req+str(playlist_id))
-            print j.text
             j= j.json()
             d= os.path.split(p)[0] 
             if not os.path.exists(d): os.makedirs(d)
             json.dump( j, open(p,"w"), indent=2 )
-        return [
-            c.video(**x)
-            for x in j["video"] ]
+        return [ c.video(**x) for x in j["video"] ]
 
 def get(file=None,**o):
     if not file: return None
