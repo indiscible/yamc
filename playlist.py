@@ -26,17 +26,17 @@ class Playlist(RPC):
     
     @classmethod
     def Add(c,playlistid,item):
-        item= plugin.get( **item ) or \
+        items= plugin.get( **item ) or \
               yamc.AudioLibrary.Get( **item )
-        if not item: return "Not found"
-        print item
-        items= item["file"] if type(item["file"])==list else [item]
-        for item in items:
-            item["type"]="song"        
-            vlc.command("in_enqueue", input= quote( item["file"] ) )
-            c.items.append( item )
+        if not items: return "Not found"
+
+        for i in items:
+            print i 
+            i["type"]="song"        
+            vlc.command("in_enqueue", input= quote(i["file"],safe='') )
+            c.items.append( i )
             yamc.event.post().Playlist.OnAdd(
-                item,
+                i,
                 playlistid= playlistid,
                 position= len(c.items)  )
         c.dirty= True

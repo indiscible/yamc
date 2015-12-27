@@ -3,33 +3,51 @@ from urllib import unquote,quote
 import requests
 import os
 import json
+from urlparse import urlparse,parse_qs
 
-def youtube(f):
-    if not "youtube" in f: return None
-    if "videoid=" in f: id= f.split("videoid=")[1]
-    if "video_id=" in f: id= f.split("video_id=")[1]
-    elif "watch?v=" in f: id= f.split("watch?v=")[1]
-    input= 'http://youtube.com/watch?v='+id
-    return { "name": id, "file":input }
-    
-def Open(file=None):
-    if not file: return None
-    item= resolve(file)
-    print len(item)
-    if type(item["file"])==list:
-        print item["file"]
-        vlc.command("pl_empty")
-        for t in item["file"]:
-            vlc.command("in_enqueue",input=quote(t))
-        vlc.command("pl_play")
-        return { "playlistid":0, "position":1 }
-    else:
-        vlc.command("in_play",input=quote(item["file"]))
-    return item
 
+
+
+class youtube:
+    root='http://youtube.com/'
+    @classmethod
+    def open(c,f):
+        u= urlparse(f)
+        if not "youtube" in u.netloc: return None
+        q= { k:v[0] for k,v in parse_qs(u.query).items() }
+        print q
+        return c.list(**q) or [c.video(**q)]
+        
+    @classmethod
+    def video(c,name=None, video_id=None, videoid=None, v=None,**o):
+        id= video_id or videoid or v
+        name= name or id
+        if not id: return None
+        return { "name": name,
+                 "file": c.root + "watch?v=" + id }
+        
+    @classmethod
+    def list(c,playlist_id=None,**o):
+        if not playlist_id: return None
+        p= os.path.join("youtube.com","list",str(playlist_id))
+        if os.path.exists(p):
+            j= json.load( open(p) )
+        else:
+            req='list_ajax?action_get_list=1&style=json&list='
+            print c.root+req+str(playlist_id)
+            j= requests.get(c.root+req+str(playlist_id))
+            print j.text
+            j= j.json()
+            d= os.path.split(p)[0] 
+            if not os.path.exists(d): os.makedirs(d)
+            json.dump( j, open(p,"w"), indent=2 )
+        return [
+            c.video(name=x["title"],v=x["encrypted_id"])
+            for x in j["video"] ]
+                           
 def get(file=None,**o):
     if not file: return None
-    return youtube(file) or soundcloud.open(file)
+    return youtube.open(file) or soundcloud.open(file)
 
 class soundcloud:
     root="https://api.soundcloud.com/"
@@ -37,19 +55,23 @@ class soundcloud:
     
     @classmethod
     def open(c,f):
-        if not "soundcloud" in f: return None
-        input= unquote(f).split("https://")[1]
-        id= unquote(f).split("soundcloud.com")[1]
-        if "sets" in input:
-            return { "name": id, "file": c.set(input) }
-        return { "name":id, "file": input }
+        u= urlparse(f)
+        if not "soundcloud" in u.netloc: return None
+        url= unquote(u.query).split("https://")[1]
+        return c.sets(url) or [c.song(url)]
 
     @classmethod
-    def set(c,url):
+    def song(c,url,title=None):
+        title=title or os.path.split(url)[1]
+        return { "name":  title,
+                 "file": "https://"+url }
+       
+    @classmethod
+    def sets(c,url):
+        if not "sets" in url: return None
         j= c.resolve(url)
-        return [ {
-            "file":t["permalink_url"],
-            "title":t["title"] } for t in j["tracks"] ]
+        return [ c.song(t["permalink_url"][7:],title=t["title"])
+                 for t in j["tracks"] ]
 
     @classmethod
     def resolve(c,url):
