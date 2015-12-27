@@ -88,7 +88,8 @@ def filehash(file):
         return sha1(inp.read()).hexdigest()
 
 def go():
-    libs= { yamc:"", event:"", playlist:"", vlc:"", plugin:"" }
+    libs= { yamc:"", event:"", playlist:"",
+            vlc:"", plugin:"", audiolibrary:"" }
     while(1):
         print "Waiting for request"
         rl = select( ss, [], [])
