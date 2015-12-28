@@ -57,9 +57,14 @@ class Playlist(RPC):
         
     @classmethod
     def getnodes(c):
-        print "getnodes"
+        if len(c.nodes)!=len(c.items): c.dirty= True
         if not c.dirty: return c.nodes
-        c.nodes= [ int(i["id"]) for i in vlc.playlist() ]
+        pl= vlc.playlist()
+        c.nodes= [ int(i["id"]) for i in pl ]
+        if len(c.nodes)>len(c.items):
+            c.items= [
+                { 'title': i["name"], 'file': i["uri"] }
+                for i in pl ]
         c.dirty= False
         return c.nodes
 
