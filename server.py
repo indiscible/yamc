@@ -8,17 +8,20 @@ import yamc
 import plugin
 import playlist
 import vlc
+import audiolibrary
 from hashlib import sha1
 import logging
 import signal
 import sys
+import traceback
 logging.basicConfig(filename="server.txt",level=logging.DEBUG)
 def reply(j):
     try:
         e= yamc.execute(j)
     except: 
         print "error executing ", j
-        print sys.exc_info(),j
+        for line in traceback.format_tb( sys.exc_info()[2] ):
+            print line
         return { "id": j["id"], "jsonrpc":"2.0", "error":
                  { "code": 0, "message": "eerror" } }
     return { "id": j["id"], "jsonrpc":"2.0", "result": e }
