@@ -271,7 +271,12 @@ class Files(RPC):
 def handleudp(s):
     event.handleudp(s,globals(), locals())
 
+
+
+    
+out= open("log/yamc.execute","w")
 def execute(j):
+    print >> out, json.dumps(j)
     c,m= j["method"].split(".")
     C= globals()[c]
     print c,m
