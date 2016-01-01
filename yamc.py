@@ -8,7 +8,6 @@ import requests
 from playlist import Playlist
 from audiolibrary import AudioLibrary
 import vlc
-
 from rpc import RPC
 from os import path,mkdir
 from urllib import unquote,quote
@@ -234,7 +233,9 @@ class Player(RPC):
         c.totaltime= seconds2time(s["length"])
         c.volume= s["volume"]/255.0
         c.position= Playlist.position(**s)
-        c.item= Playlist.items[c.position]
+        
+        if c.position<len(Playlist.items):
+            c.item= Playlist.items[c.position] 
         if s["state"]=="stopped":
             c.speed=0
         elif s["state"]=="playing":
