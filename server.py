@@ -9,6 +9,7 @@ import plugin
 import playlist
 import vlc
 import audiolibrary
+import database
 from hashlib import sha1
 import logging
 import signal
@@ -20,6 +21,7 @@ def reply(j):
         e= yamc.execute(j)
     except: 
         print "error executing ", j
+        print sys.exc_info()
         for line in traceback.format_tb( sys.exc_info()[2] ):
             print line
         return { "id": j["id"], "jsonrpc":"2.0", "error":
@@ -72,6 +74,8 @@ def init():
 if not locals().has_key("server"):
     server,ss= init()
     print "server started"
+    print server
+    print ss
 
 def close():
     global ss
@@ -79,6 +83,8 @@ def close():
         s.close()
     ss= None
     print "serve stopped"
+    database.dumpdb()
+    print "database stored"
 
 def sigint(signal,frame):
     close()
@@ -92,7 +98,8 @@ def filehash(file):
 
 def go():
     libs= { yamc:"", event:"", playlist:"",
-            vlc:"", plugin:"", audiolibrary:"" }
+            vlc:"", plugin:"", audiolibrary:"",
+            database:"" }
     while(1):
         print "Waiting for request"
         rl = select( ss, [], [])
@@ -115,6 +122,4 @@ def go():
             else:
                 print "bad select", r
                         
-
-
 go()
