@@ -2,6 +2,7 @@ from rpc import RPC
 import vlc
 import plugin
 import yamc
+from audiolibrary import AudioLibrary
 from urllib import quote
 
 class Playlist(RPC):
@@ -27,9 +28,10 @@ class Playlist(RPC):
     @classmethod
     def Add(c,playlistid,item):
         items= plugin.get( **item ) or \
-              yamc.AudioLibrary.Get( **item )
-        if not items: return "Not found"
-
+              AudioLibrary.Get( **item )
+        if type(items)!=list:
+            print "not list:",items
+            return "Not found"
         for i in items:
             print i 
             i["type"]="song"        
@@ -52,8 +54,15 @@ class Playlist(RPC):
         
         print "playlist one position:", position
         print "nodes:", c.getnodes()
-        vlc.command("pl_play", id= c.getnodes()[position])
+        if not len(c.nodes): return {}
+        vlc.command("pl_play", id= c.getid(position))
         return c.items[position]
+        
+    @classmethod
+    def getid(c,pos):
+        n= c.getnodes()
+        if pos>=len(n): return -1
+        return n[pos]
         
     @classmethod
     def getnodes(c):
