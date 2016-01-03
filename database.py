@@ -119,12 +119,12 @@ class Mp3:
         return c.Song(file=ff,thumbnail=t, **j)
 
     @classmethod 
-    def Artist(c,**a):
-        return Artist(artist=a["artist"], thumbnail= a["thumbnail"] )
+    def Artist(c,artist="Unknown Artist",**a):
+        return Artist(artist=artist, thumbnail= a["thumbnail"] )
 
     @classmethod 
-    def Album(c,**a):
-        return Album(title=a["album"], displayartist=a["artist"],
+    def Album(c,album="Unknown Album", artist="Unknown Artist", **a):
+        return Album(title=album, displayartist=artist,
                      thumbnail=a["thumbnail"] )
  
     @classmethod 
@@ -134,12 +134,13 @@ class Mp3:
         
     @classmethod 
     def Song(c, genre="", date="1976", tracknumber="0/0", length="0",
-         discnumber="0/0", **s ):
+         discnumber="0/0", album="Unknown Album", artist="Unknown Artist",
+             **s ):
         return Song(
             file= s.get("file"),
             title= s.get("title"),
-            album= s["album"],
-            artist= s["artist"],
+            album= album,
+            artist= artist,
             thumbnail= s["thumbnail"],
             genre= genre if type(genre)==list else [genre],
             year= date[:4],

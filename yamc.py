@@ -1,7 +1,6 @@
 import subprocess
 import event
 import plugin
-import external
 import json
 import time
 import requests
