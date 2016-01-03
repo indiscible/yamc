@@ -58,7 +58,10 @@ docs/_build/
 
 # PyBuilder
 target/
-
+# emacs stuff
+\#*.*\#
+# vi stuff
+*.swp
 database
 image
 log
