@@ -45,6 +45,10 @@ class Playlist(RPC):
         return "OK"
 
     @classmethod
+    def Insert(c,position,playlistid,item):
+        return c.Add(playlistid,item)
+        
+    @classmethod
     def Open(c,playlistid=None, position=None, **o):
         if playlistid==None or position==None:
             position= len(c.items)
