@@ -82,11 +82,9 @@ def Genre(genreid=None, title=None):
 
 def Select(t,p,l):
     v= globals()[t]
-    print len(v)
     r= [ { k:r[k] for k in p if r.has_key(k) }
          for r in v[ l["start"]:l["end"] ] ]
     l["total"]= len(v)
-    l["end"]= len(r)
     return { t: r, "limits":l }
 
 def dumptable(t,n,**kw):
