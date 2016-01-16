@@ -41,7 +41,7 @@ def post( d ):
         print "Error:",e, d
         return Response( "", mimetype='application/json')
     r= json.dumps(r)
-    print r
+    #print r
     return Response(  r, mimetype='application/json')
 
 def get(d):
