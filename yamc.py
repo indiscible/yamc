@@ -212,7 +212,7 @@ class Player(RPC):
     def GetProperties(c,playerid,properties):
         s= vlc.status();
         try:
-            stream= s["information"]["category"]["Stream 0"]
+            stream= vlc.audiostream( s["information"]["category"] )
             XBMC.MusicPlayerCodec= stream["Codec"]
             XBMC.MusicPlayerSampleRate= stream["Sample_rate"]
             XBMC.MusicPlayerBitRate= stream["Bitrate"]

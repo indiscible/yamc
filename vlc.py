@@ -25,5 +25,10 @@ def playlist():
         print r
         return []
         
+def audiostream(ss):
+    for s in ss.values():
+        if s["Type"]=="Audio":
+            return s
+    return None
 
 
