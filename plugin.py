@@ -4,6 +4,7 @@ from urllib import unquote,quote
 import requests
 import os
 import json
+import re
 from urlparse import urlparse,parse_qs
 
 def Thumbnail(url):
@@ -16,48 +17,105 @@ def Thumbnail(url):
         if not os.path.exists(d): os.makedirs(d)
         open(p,'wb').write( requests.get(url).content )
     return q
-    
+
 class youtube:
     root='http://youtube.com/'
+    key= "AIzaSyBsU-XLWFjoSTf5Z42Yp5LGnV9-5JdWg6g"
+    api= "https://www.googleapis.com/youtube/v3/"
     @classmethod
     def Open(c,f):
         u= urlparse(f)
+        print u
         if not "youtube" in u.netloc: return None
         q= { k:v[0] for k,v in parse_qs(u.query).items() }
-        return c.list(**q) or [ c.video(**q) ]
+        return c.Playlist(**q) or [c.Video(**q)]
         
+    @staticmethod
+    def to_seconds(t):
+        m= re.match(r"PT((\d*)H)?((\d*)M)?(\d*)S",t)
+        if not m:
+            print "no duration:", t
+            return 0
+        hh,h, mm, m,s= m.groups()
+        h= h or 0
+        m= m or 0
+        return int(h)*3600+int(m)*60+int(s)
+    
     @classmethod
-    def video(c, thumbnail=None, video_id=None, videoid=None, encrypted_id=None, v=None, length_seconds="0", author="", title=None, album=None, track=None, **o):
-        id= video_id or videoid or v or encrypted_id
+    def Video(c,id=None, v= None, videoid=None, video_id=None, album=None, track=0, **o):
+        id= id or v or videoid or video_id
         if not id: return None
-        artist= database.Artist(artist=author)
-        return database.Song( 
-            title= title or id,
-            file= c.root + "watch?v=" + id,
-            duration= int(length_seconds),
-            thumbnail= Thumbnail(thumbnail),
-            track= track or 0,
-            album= album,
-            artist= author )
+        j= c.resolve(
+                    "videos",
+                    id= id,
+                    part="snippet,contentDetails")["items"]
+        if len(j)==0: return None
+        j= j[0]
+        snippet= j["snippet"]
+        details= j["contentDetails"]
+        artist= c.Artist(**snippet)
+        album= album or c.Album(**snippet)
+        print snippet["thumbnails"]
+        return database.Song(
+            title= snippet["title"],
+            artist= artist["artist"],
+            duration= c.to_seconds( details["duration"] ),
+            thumbnail= Thumbnail( snippet["thumbnails"]["default"]["url"] ),
+            album= album["title"],
+            track= track,
+            file= c.root + "watch?v=" + id )
         
     @classmethod
-    def list(c,playlist_id=None,**o):
-        if not playlist_id: return None
-        p= os.path.join("youtube.com","list",str(playlist_id))
-        if os.path.exists(p):
-            j= json.load( open(p) )
-        else:
-            req='list_ajax?action_get_list=1&style=json&list='
-            j= requests.get(c.root+req+str(playlist_id)).json()
-            d= os.path.split(p)[0] 
-            if not os.path.exists(d): os.makedirs(d)
-            json.dump( j, open(p,"w"), indent=2 )
-        print j
+    def Album(c, title, thumbnails, **o):
+        return database.Album(
+            title= title,
+            thumbnail= Thumbnail( thumbnails["medium"]["url"]) )
+                               
+    @classmethod
+    def Artist(c, channelId=None, **o):
+        snippet= c.resolve("channels",
+                           part="snippet",
+                           id=channelId)["items"][0]["snippet"]
+        return database.Artist( artist= snippet["title"],
+                                thumbnail= Thumbnail(snippet["thumbnails"]["medium"]["url"]) )
+    
+    @classmethod
+    def Playlist(c,playlist_id=None,list=None,**o):
+        id= playlist_id or list
+        if not id: return None
+        j= c.resolve( "playlists", 
+                            id= id,
+                            part="snippet")
+        if j.has_key("items"): j= j["items"][0]
+        snippet= j["snippet"]
+        print snippet
+        artist= c.Artist( **snippet )
+        album= c.Album( **snippet )
+        items= c.resolve( "playlistItems",
+                          playlistId= id,
+                          part="snippet",
+                          maxResult=50)["items"]
         #genre= database.Genre(genre=j["genre"])
-        artist= database.Artist(artist= j["author"],compilationartist= True )
-        album= database.Album(title= j["title"], displayartist= j["author"])
-        return [ c.video(album= album["title"],**x)
-                 for x in j["video"] ]
+        return [ c.Video(id=x["snippet"]["resourceId"]["videoId"],
+                         album= album)
+                 for x in items ]
+
+    @classmethod
+    def resolve(c,w,refresh=False,**o):
+        if len(o)==0: return None
+        print o
+        r= o.get("orUsername") or o.get("playlistId") or o.get("id")
+        p= os.path.join("youtube.com",w,r)
+        print o,"=>", p
+        if (not refresh) and os.path.exists(p): return json.load(open(p))
+        query= "?" + "&".join( [ str(k)+"="+str(v) for k,v in o.items() ] )
+        print query
+        j= requests.get(c.api+w+query + "&key="+c.key).json()
+        dir= os.path.split(p)[0] 
+        if not os.path.exists(dir): os.makedirs(dir)
+        json.dump( j, open(p,"wb"), indent=2 )
+        return j
+
 
 def get(file=None,**o):
     if not file: return None
