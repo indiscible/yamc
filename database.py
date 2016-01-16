@@ -43,7 +43,11 @@ def Song(songid=None, album=None, artist=None, **o):
 def Artist(artistid=None, **a):
     name= a["artist"]
     artistid= artistid or ArtistId.get(name)
-    if artistid: return artists[ artistid-1 ]
+    if artistid:
+        if len(a):
+            artists[ artistid-1 ].update(a)
+            dumpdb()
+        return artists[ artistid-1 ]
     artistid= len(artists)+1
     a["artistid"]= artistid
     ArtistId[name]= artistid
@@ -54,7 +58,9 @@ def Album(albumid=None,**a):
     t= a["title"]
     albumid= albumid or AlbumId.get(t)
     if albumid:
-        albums[albumid-1].update(a)
+        if len(a):
+            albums[albumid-1].update(a)
+            dumpdb()
         return albums[albumid-1]
     albumid= len(albums)+1
     a["albumid"]= albumid
