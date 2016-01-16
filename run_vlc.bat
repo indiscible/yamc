@@ -1,1 +1,1 @@
-vlc --extraintf http --http-port=10000
+vlc --extraintf http:logger --http-port=10000 --verbose=2 --file-logging --logfile=log/vlc.txt
