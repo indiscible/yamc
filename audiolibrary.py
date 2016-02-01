@@ -5,9 +5,11 @@ import database
 
 class AudioLibrary(RPC):
     @classmethod 
-    def Get(c,songid=None,**o):
-        if not songid: return None
-        return [database.songs[ songid-1 ]]
+    def Get(c,songid=None,albumid=None,**o):
+        if songid: return [database.songs[ songid-1 ]]
+        if albumid: return [
+                s for s in database.songs if s["albumid"]==albumid ]
+        return None
 
     @classmethod
     def GetArtists(c,limits,properties=[]):
